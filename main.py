@@ -1,8 +1,8 @@
 # main.py
 import streamlit as st
 import json
-import requests
 import gspread
+import requests
 from oauth2client.service_account import ServiceAccountCredentials
 
 from login import app as login_page
@@ -36,10 +36,8 @@ SCOPE = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-@st.cache_resource
 def connect_google_sheet():
     if "google" not in st.secrets or "creds" not in st.secrets["google"]:
-        st.warning("⚠️ Google credentials missing in secrets.toml")
         return None
     try:
         creds_json = st.secrets["google"]["creds"]
@@ -53,30 +51,38 @@ def connect_google_sheet():
 
 sheet = connect_google_sheet()
 
-# ------------------- SIDEBAR -------------------
+# ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home", "About", "AI Assistant", "Contact", "Login", "Profile"]
-st.session_state.page = st.sidebar.radio("Go to", main_menu, index=main_menu.index(st.session_state.page))
+main_menu = ["Home", "About", "AI Assistant", "Contact", "Login"]
+for item in main_menu:
+    if st.sidebar.button(item, use_container_width=True):
+        st.session_state.page = item
+        st.session_state.redirect_done = False
+        st.rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
+
+    # 🆕 New Chat
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.ai_mode = "new"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
+    # 👤 Guest Chat
     if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
-    # Load old chats for logged-in users
+    # 📂 Load Old Chats (Logged-in Users)
     if st.session_state.logged_in and st.session_state.user:
+        # Load user chats if not already loaded
         if not st.session_state.user_chats and sheet:
             try:
                 rows = sheet.get_all_records()
@@ -96,6 +102,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             except Exception as e:
                 st.warning(f"⚠️ Failed to load chats: {e}")
 
+        # Display selectbox only if chats exist
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
             def _set_topic():
@@ -105,7 +112,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
-                st.experimental_rerun()
+                st.rerun()
 
             st.selectbox(
                 "📚 Select a saved chat:",
@@ -114,37 +121,40 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=_set_topic
             )
 
-# ------------------- AGRI NEWS -------------------
+# ------------------- Optional: Agri News Sidebar -------------------
 st.sidebar.markdown("---")
-with st.sidebar.expander("📰 Agri News", expanded=True):
-    query = st.text_input("Keyword", value="agriculture", key="agri_news_query")
+st.sidebar.subheader("📰 Agri News")
 
-    @st.cache_data(ttl=600)
-    def get_agri_news(q):
-        try:
-            api_key = st.secrets.get("NEWS_API_KEY", "")
-            if not api_key:
-                return []
-            url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
-            res = requests.get(url).json()
-            return res.get("articles", [])
-        except Exception:
+query = st.sidebar.text_input("Keyword", value="agriculture")
+
+@st.cache_data(ttl=600)
+
+def get_agri_news(q):
+    try:
+        api_key = st.secrets.get("NEWS_API_KEY", "")
+        if not api_key:
             return []
+        url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
+        res = requests.get(url).json()
+        return res.get("articles", [])
+    except Exception:
+        return []
 
-    articles = get_agri_news(query)
-    if not articles:
-        st.info("No news found or NEWS_API_KEY missing.")
-    for n in articles:
-        st.markdown(f"**[{n['title']}]({n['url']})**")
-        st.caption(n["source"]["name"])
-        st.markdown("---")
+for n in get_agri_news(query):
+    st.sidebar.markdown(f"**[{n['title']}]({n['url']})**")
+    st.sidebar.caption(n["source"]["name"])
+    st.sidebar.markdown("---")
+
 
 # ------------------- PAGE ROUTING -------------------
-# Redirect logged-in users from Login to Profile
+# Direct logged-in users from login to profile
 if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
     st.session_state.page = "Profile"
     st.session_state.redirect_done = True
-    st.experimental_rerun()
+    st.rerun()
+
+else:
+    st.error("Page not found")
 
 page = st.session_state.page
 if page == "Home":
@@ -159,5 +169,3 @@ elif page == "Login":
     login_page()
 elif page == "Profile":
     profile_page()
-else:
-    st.error("Page not found")
