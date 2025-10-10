@@ -153,9 +153,6 @@ if st.session_state.logged_in and st.session_state.page == "Login" and not st.se
     st.session_state.redirect_done = True
     st.rerun()
 
-else:
-    st.error("Page not found")
-
 page = st.session_state.page
 if page == "Home":
     home_page()
