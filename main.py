@@ -15,12 +15,11 @@ import streamlit as st
 # Hide Streamlit default toolbar (⋮), GitHub, and Fork buttons
 st.markdown("""
     <style>
-    /* Hide Streamlit's default top-right menu and toolbar */
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
+    /* Hide only Streamlit's default system buttons */
+    [data-testid="stToolbar"] {display: none !important;}     /* Hides ⋮ menu (Rerun, Settings, Print) */
+    [data-testid="stDecoration"] {display: none !important;}  /* Hides "Fork" and "GitHub" buttons */
+    [data-testid="stStatusWidget"] {display: none !important;}/* Hides top-right status indicator */
+    footer {visibility: hidden !important;}                   /* Hide Streamlit footer only */
     </style>
 """, unsafe_allow_html=True)
 
