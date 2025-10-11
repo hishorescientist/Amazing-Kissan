@@ -16,6 +16,29 @@ import streamlit as st
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
+st.markdown("""
+    <style>
+    /* --- hide new Streamlit top-right toolbar icons --- */
+    header div[role="button"][title="Share"],
+    header div[role="button"][title="Star"],
+    header div[role="button"][title="Edit"],
+    header a[href*="github.com"],
+    header button[title*="Menu"],
+    header svg[data-testid="stIconGithub"],
+    header [data-testid="stActionButton"],
+    header [data-testid="stToolbarActions"],
+    header [data-testid="stBaseToolbar"],
+    header button[kind="icon"],
+    header div[role="menu"],
+    header [data-testid="stToolbar"] {
+        display: none !important;
+    }
+
+    /* hide footer text, keep sidebar + header visible */
+    footer {display: none !important;}
+    </style>
+""", unsafe_allow_html=True)
+
 # ------------------- SESSION STATE -------------------
 default_state = {
     "page": "Home",
