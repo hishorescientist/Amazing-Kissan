@@ -20,6 +20,7 @@ hide_menu = """
      visibility:hidden;
 }
 </style>
+"""
      
 # ------------------- SESSION STATE -------------------
 default_state = {
