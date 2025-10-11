@@ -13,16 +13,6 @@ from about import app as about_page
 from contact import app as contact_page
 import streamlit as st
 
-# Hide Streamlit default menu and footer
-st.markdown("""
-    <style>
-    footer {visibility: hidden;}
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
-    </style>
-""", unsafe_allow_html=True)
-
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
