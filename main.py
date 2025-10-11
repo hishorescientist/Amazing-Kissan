@@ -11,70 +11,10 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-import streamlit.components.v1 as components
+import streamlit as st
 # Add this function and call it at the beginning of your script
-
-
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
-# place this immediately after st.set_page_config(...)
-# keep footer hidden (optional)
-st.markdown('<style>footer{display:none !important;}</style>', unsafe_allow_html=True)
-
-# client-side JS to remove only the top-right system buttons (but NOT anything inside the sidebar)
-components.html(
-    """
-    <script>
-    (function removeStreamlitTopButtons(){
-      // selectors to catch common Streamlit toolbar/decoration/share widgets across versions
-      const selectors = [
-        'div[data-testid="stToolbar"]',
-        'div[data-testid="stDecoration"]',
-        'div[data-testid="stStatusWidget"]',
-        'button[title*="Rerun"]',
-        'button[title*="Settings"]',
-        'button[title*="Share"]',
-        'a[href*="github.com"]',
-        'a[title*="Fork"]',
-        'div[title="Share this app"]',
-        'a[data-testid="share-button"]'
-      ];
-
-      function removeIfNotSidebar(el){
-        // protect sidebar: don't remove elements that are inside the sidebar area
-        if (!el) return false;
-        if (el.closest && el.closest('[data-testid="stSidebar"]')) return false;
-        el.remove();
-        return true;
-      }
-
-      function attemptCleanup(){
-        let removedCount = 0;
-        selectors.forEach(sel => {
-          document.querySelectorAll(sel).forEach(el => {
-            if (removeIfNotSidebar(el)) removedCount++;
-          });
-        });
-        return removedCount;
-      }
-
-      // Try several times while Streamlit finishes rendering
-      let tries = 0;
-      const maxTries = 12;
-      const interval = setInterval(() => {
-        tries++;
-        const removed = attemptCleanup();
-        // stop early if we removed something or after max tries
-        if (removed > 0 || tries >= maxTries) {
-          clearInterval(interval);
-        }
-      }, 250);
-    })();
-    </script>
-    """,
-    height=0,
-)
 
 # ------------------- SESSION STATE -------------------
 default_state = {
