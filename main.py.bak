@@ -28,7 +28,7 @@ st.markdown("""
     
     /* Keep header and sidebar visible */
     header {visibility: visible !important;}
-    [data-testid="st.sidebar"] {visibility: visible !important;}
+    [data-testid="stSidebar"] {visibility: visible !important;}
     
     /* Optional: hide footer text only */
     footer {display: none !important;}
