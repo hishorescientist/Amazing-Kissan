@@ -14,22 +14,19 @@ from contact import app as contact_page
 import streamlit as st
 # Add this function and call it at the beginning of your script
 
-st.markdown("""
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-/* The header tag often contains the GitHub/Fork button on deployed apps,
-   but may also contain other elements. Use with caution.
-   Alternatively, you can target a specific data-testid for the three-dot menu:
-   div[data-testid="stDecoration"] {visibility: hidden;}
-   div[data-testid="stHeader"] {display: none;}
-*/
-</style>
-""", unsafe_allow_html=True)
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
+
+# Hide Streamlit system UI elements, keep your sidebar/menu visible
+st.markdown("""
+    <style>
+    [data-testid="stToolbar"] {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    footer {visibility: hidden !important;}
+    </style>
+""", unsafe_allow_html=True)
 
 # ------------------- SESSION STATE -------------------
 default_state = {

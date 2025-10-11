@@ -18,13 +18,20 @@ import streamlit as st
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
-# Hide Streamlit system UI elements, keep your sidebar/menu visible
+# Hide only Streamlit’s default toolbar and footer — keep sidebar visible
 st.markdown("""
     <style>
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
-    footer {visibility: hidden !important;}
+    /* Hide Streamlit top toolbar (⋮, GitHub, Fork) */
+    div[data-testid="stToolbar"] {display: none !important;}
+    div[data-testid="stDecoration"] {display: none !important;}
+    div[data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* Keep header and sidebar visible */
+    header {visibility: visible !important;}
+    [data-testid="stSidebar"] {visibility: visible !important;}
+    
+    /* Optional: hide footer text only */
+    footer {display: none !important;}
     </style>
 """, unsafe_allow_html=True)
 
