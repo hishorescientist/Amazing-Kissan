@@ -21,6 +21,7 @@ hide_menu = """
 }
 </style>
 """
+st.markdown(hide_menu,unsafe_allow_html=True)
      
 # ------------------- SESSION STATE -------------------
 default_state = {

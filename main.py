@@ -19,6 +19,9 @@ hide_menu = """
 #MainMenu {
      visibility:hidden;
 }
+[data-testid="stToolbar"] {
+     visibility:hidden;
+}
 </style>
 """
 st.markdown(hide_menu,unsafe_allow_html=True)
