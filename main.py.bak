@@ -28,6 +28,9 @@ header {visibility: hidden;}
 </style>
     """)
 
+
+# Call the function
+hide_streamlit_ui_elements()
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
