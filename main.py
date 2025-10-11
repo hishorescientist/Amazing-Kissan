@@ -16,7 +16,6 @@ import streamlit as st
 # Hide Streamlit default menu and footer
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     [data-testid="stToolbar"] {display: none !important;}
