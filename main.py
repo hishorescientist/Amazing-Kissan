@@ -11,11 +11,17 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-import streamlit as st
 # Add this function and call it at the beginning of your script
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
+hide_menu = """
+<style>
+#MainMenu {
+     visibility:hidden;
+}
+</style>
+"""
+     
 # ------------------- SESSION STATE -------------------
 default_state = {
     "page": "Home",

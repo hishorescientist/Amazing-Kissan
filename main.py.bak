@@ -11,45 +11,16 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-import streamlit as st
 # Add this function and call it at the beginning of your script
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
-import streamlit.components.v1 as components
-
-# Hide Streamlit top toolbar icons (⋮, GitHub, Share, etc.)
-components.html(
-    """
-    <script>
-    const removeTopIcons = () => {
-        // Try to find the header element
-        const header = window.parent.document.querySelector('header');
-        if (!header) return;
-
-        // Find all icon buttons and link elements inside header
-        const buttons = header.querySelectorAll('button, a, svg, div[role="button"]');
-        buttons.forEach(btn => {
-            // Skip logo or layout containers, remove only visible small icons
-            const size = btn.getBoundingClientRect();
-            if (size.width < 80 && size.height < 80) {
-                btn.style.display = 'none';
-            }
-        });
-    };
-
-    // Run immediately and keep trying for 2 seconds
-    let tries = 0;
-    const timer = setInterval(() => {
-        removeTopIcons();
-        tries++;
-        if (tries > 20) clearInterval(timer);
-    }, 100);
-    </script>
-    """,
-    height=0,
-)
-
+hide_menu = """
+<style>
+#MainMenu {
+     visibility:hidden;
+}
+</style>
+     
 # ------------------- SESSION STATE -------------------
 default_state = {
     "page": "Home",
