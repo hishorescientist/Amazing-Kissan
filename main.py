@@ -19,7 +19,7 @@ hide_menu = """
 #MainMenu {
      visibility:hidden;
 }
-[data-testid="stToolbar"] {
+[data-testid="stToolbarActions"] {
      visibility:hidden;
 }
 </style>
