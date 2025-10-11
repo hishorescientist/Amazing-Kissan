@@ -12,6 +12,17 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 import streamlit as st
+# Hide Streamlit default toolbar (⋮), GitHub, and Fork buttons
+st.markdown("""
+    <style>
+    /* Hide Streamlit's default top-right menu and toolbar */
+    [data-testid="stToolbar"] {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
