@@ -1,4 +1,4 @@
-# main.py
+<# main.py
 import streamlit as st
 import json
 import gspread
@@ -26,7 +26,7 @@ header {visibility: hidden;}
    div[data-testid="stHeader"] {display: none;}
 */
 </style>
-    """)
+""", unsafe_allow_html=True)
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
