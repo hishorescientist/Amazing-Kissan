@@ -17,7 +17,6 @@ import streamlit as st
 st.markdown("""
     <style>
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     [data-testid="stToolbar"] {display: none !important;}
     [data-testid="stDecoration"] {display: none !important;}
     [data-testid="stStatusWidget"] {display: none !important;}
