@@ -13,21 +13,21 @@ from about import app as about_page
 from contact import app as contact_page
 import streamlit as st
 # Add this function and call it at the beginning of your script
-def hide_streamlit_ui_elements():
-    hide_streamlit_style = """
-        <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        /* The header tag often contains the GitHub/Fork button on deployed apps,
-           but may also contain other elements. Use with caution.
-           Alternatively, you can target a specific data-testid for the three-dot menu:
-           div[data-testid="stDecoration"] {visibility: hidden;}
-           div[data-testid="stHeader"] {display: none;}
-        */
-        </style>
-    """
-    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+/* The header tag often contains the GitHub/Fork button on deployed apps,
+   but may also contain other elements. Use with caution.
+   Alternatively, you can target a specific data-testid for the three-dot menu:
+   div[data-testid="stDecoration"] {visibility: hidden;}
+   div[data-testid="stHeader"] {display: none;}
+*/
+</style>
+    """)
+
 
 # Call the function
 hide_streamlit_ui_elements()
