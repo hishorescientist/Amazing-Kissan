@@ -12,17 +12,25 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 import streamlit as st
-# Hide Streamlit default toolbar (⋮), GitHub, and Fork buttons
-st.markdown("""
-    <style>
-    /* Hide only Streamlit's default system buttons */
-    [data-testid="stToolbar"] {display: none !important;}     /* Hides ⋮ menu (Rerun, Settings, Print) */
-    [data-testid="stDecoration"] {display: none !important;}  /* Hides "Fork" and "GitHub" buttons */
-    [data-testid="stStatusWidget"] {display: none !important;}/* Hides top-right status indicator */
-    footer {visibility: hidden !important;}                   /* Hide Streamlit footer only */
-    </style>
-""", unsafe_allow_html=True)
+# Add this function and call it at the beginning of your script
+def hide_streamlit_ui_elements():
+    hide_streamlit_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        /* The header tag often contains the GitHub/Fork button on deployed apps,
+           but may also contain other elements. Use with caution.
+           Alternatively, you can target a specific data-testid for the three-dot menu:
+           div[data-testid="stDecoration"] {visibility: hidden;}
+           div[data-testid="stHeader"] {display: none;}
+        */
+        </style>
+    """
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# Call the function
+hide_streamlit_ui_elements()
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 

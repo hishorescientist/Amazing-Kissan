@@ -12,15 +12,14 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 import streamlit as st
-
-# Hide Streamlit default menu and footer
+# Hide Streamlit default toolbar (⋮), GitHub, and Fork buttons
 st.markdown("""
     <style>
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
+    /* Hide only Streamlit's default system buttons */
+    [data-testid="stToolbar"] {display: none !important;}     /* Hides ⋮ menu (Rerun, Settings, Print) */
+    [data-testid="stDecoration"] {display: none !important;}  /* Hides "Fork" and "GitHub" buttons */
+    [data-testid="stStatusWidget"] {display: none !important;}/* Hides top-right status indicator */
+               /* Hide Streamlit footer only */
     </style>
 """, unsafe_allow_html=True)
 
