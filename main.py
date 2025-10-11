@@ -16,6 +16,14 @@ from contact import app as contact_page
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 hide_menu = """
 <style>
+
+/* Select the sidebar hamburger icon */
+    [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
+        content: "🛠️";  /* Replace with any emoji or symbol you like */
+        font-size: 20px; /* Adjust size */
+        color: #FF5733;  /* Change color */
+    }
+    
 #MainMenu {
      visibility:hidden;
 }
