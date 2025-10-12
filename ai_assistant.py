@@ -170,6 +170,11 @@ def ask_ai(question, history):
   
 # ------------------- STREAMLIT APP -------------------  
 def app():  
+# --- Keep sidebar and assistant selectboxes in sync ---  
+    if "selected_old_topic" in st.session_state:  
+        st.session_state.setdefault("ai_selected_old_topic", st.session_state.selected_old_topic)  
+    if "ai_selected_old_topic" in st.session_state:  
+        st.session_state.setdefault("selected_old_topic", st.session_state.ai_selected_old_topic)  
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")  
   
     # Session defaults  
@@ -188,6 +193,7 @@ def app():
         topics = list(st.session_state.user_chats.keys())  
   
         def _set_topic():  
+            st.session_state.selected_old_topic = st.session_state.ai_selected_old_topic  
             st.session_state.current_topic = st.session_state.ai_selected_old_topic  
             st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])  
   
@@ -248,3 +254,4 @@ def app():
         # Save to Google Sheet if logged in  
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:  
             save_chat(username, st.session_state.current_topic, user_input, answer)  
+  
