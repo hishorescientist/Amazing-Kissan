@@ -5,10 +5,11 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-# ------------------- GOOGLE SHEET -------------------
-SCOPE = ["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
-@st.cache_resource(show_spinner=False)
 def connect_google_sheet():
     try:
         creds_json = st.secrets["google"]["creds"]
@@ -16,62 +17,32 @@ def connect_google_sheet():
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)
         return client.open("User").worksheet("Sheet1")
-    except Exception as e:
-        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+    except:
         return None
 
-# ------------------- AUTH -------------------
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def get_all_users(sheet):
-    if not sheet: return []
-    try: return sheet.get_all_records()
-    except Exception: return []
+    try:
+        return sheet.get_all_records()
+    except:
+        return []
 
 def verify_user(sheet, username, password):
     hashed = hash_password(password)
     users = get_all_users(sheet)
     return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
 
-def save_user(sheet, user):
-    if not sheet: return False
-    users = get_all_users(sheet)
-    usernames = [u["username"] for u in users]
-    row = [user.get("username",""), user.get("password",""), user.get("name",""),
-           user.get("email",""), user.get("phone",""), user.get("address",""), user.get("dob","")]
-    try:
-        if user["username"] in usernames:
-            idx = usernames.index(user["username"])+2
-            sheet.update(f"A{idx}:G{idx}", [row])
-        else:
-            sheet.append_row(row)
-        return True
-    except Exception as e:
-        st.error(f"❌ Error saving user: {e}")
-        return False
-
-# ------------------- LOGIN PAGE -------------------
 def app():
+    sheet = connect_google_sheet()
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
-    st.session_state.setdefault("token_checked", False)
-    sheet = connect_google_sheet()
 
-    # --- STEP 1: Check localStorage token only once ---
-    if not st.session_state.token_checked:
-        components.html("""
-        <script>
-        const token = localStorage.getItem("login_token");
-        if(token){
-            window.parent.postMessage({login_token: token}, "*");
-        }
-        </script>
-        """, height=0)
-        st.session_state.token_checked = True
+    # --- hidden token input ---
+    components.html('<input type="hidden" id="login_token"/> <script>const t=localStorage.getItem("login_token"); if(t){document.getElementById("login_token").value=t;}</script>', height=0)
+    token = st.text_input("", value="", key="login_token_field", type="password", label_visibility="collapsed")
 
-    # --- STEP 2: Receive token via Streamlit message ---
-    token = st.query_params().get("login_token", [None])[0] if st.query_params() else None
     if token and not st.session_state.logged_in:
         users = get_all_users(sheet)
         user = next((u for u in users if u["username"]==token), None)
@@ -79,57 +50,26 @@ def app():
             st.session_state.logged_in = True
             st.session_state.user = user
             st.success(f"✅ Welcome back {user['username']}!")
-            # remove token param to prevent reload loops
-            components.html("""
-            <script>
-            const url = new URL(window.location);
-            url.searchParams.delete('login_token');
-            window.history.replaceState({}, document.title, url.toString());
-            </script>
-            """, height=0)
 
-    # --- STEP 3: Login/Register UI ---
     if not st.session_state.logged_in:
-        st.title("🔐 Login / Register")
-        login_tab, register_tab = st.tabs(["Login","Register"])
+        st.title("🔐 Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            user = verify_user(sheet, username, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                # Save token to localStorage
+                components.html(f'<script>localStorage.setItem("login_token","{username}");</script>', height=0)
+                st.success(f"✅ Logged in as {username}!")
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password.")
 
-        with login_tab:
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Login", use_container_width=True):
-                if not username or not password:
-                    st.warning("⚠️ Fill in both fields")
-                else:
-                    user = verify_user(sheet, username, password)
-                    if user:
-                        st.session_state.logged_in = True
-                        st.session_state.user = user
-                        # save token
-                        components.html(f"""<script>localStorage.setItem("login_token", "{username}");</script>""", height=0)
-                        st.success(f"✅ Logged in as {username}")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid username/password")
-
-        with register_tab:
-            new_user = st.text_input("New Username")
-            new_pass = st.text_input("New Password", type="password")
-            if st.button("Register", use_container_width=True):
-                if not new_user or not new_pass:
-                    st.warning("⚠️ Fill in both fields")
-                else:
-                    if any(u.get("username")==new_user.strip() for u in get_all_users(sheet)):
-                        st.warning("⚠️ Username already exists")
-                    else:
-                        user_dict = {"username": new_user.strip(),"password":hash_password(new_pass.strip()),
-                                     "name":"","email":"","phone":"","address":"","dob":""}
-                        if save_user(sheet,user_dict):
-                            st.success("✅ Registered successfully! You can now login")
-
-    # --- STEP 4: Logout ---
     if st.session_state.logged_in and st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user = None
-        components.html("""<script>localStorage.removeItem("login_token");</script>""", height=0)
-        st.success("👋 Logged out successfully")
+        components.html('<script>localStorage.removeItem("login_token");</script>', height=0)
+        st.success("✅ Logged out!")
         st.rerun()

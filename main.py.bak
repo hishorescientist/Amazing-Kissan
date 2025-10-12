@@ -63,19 +63,33 @@ def connect_ai_sheet():
 ai_sheet = connect_ai_sheet()
 
 # ------------------- AUTO-LOGIN via localStorage -------------------
-if not st.session_state.logged_in and not st.session_state.token_checked:
-    components.html("""
-    <script>
-    const token = localStorage.getItem("login_token");
-    if(token){
-        const url = new URL(window.location);
-        url.searchParams.set("login_token", token);
-        window.location.replace(url.toString());
-    }
-    </script>
-    """, height=0)
+if "token_checked" not in st.session_state:
+    st.session_state.token_checked = False
+
+# Run JS to fetch localStorage token, store in a hidden input
+components.html("""
+<input type="hidden" id="login_token" />
+<script>
+const token = localStorage.getItem("login_token");
+if(token){
+    document.getElementById("login_token").value = token;
+}
+</script>
+""", height=0)
+
+# Retrieve token using Streamlit text_input (hidden)
+token_input = st.text_input("", key="login_token_field", value="", type="password", label_visibility="collapsed")
+
+if token_input and not st.session_state.logged_in and not st.session_state.token_checked:
     st.session_state.token_checked = True
-    st.stop()  # stop until JS triggers reload
+    sheet = connect_user_sheet()
+    if sheet:
+        users = sheet.get_all_records()
+        user = next((u for u in users if u["username"]==token_input), None)
+        if user:
+            st.session_state.logged_in = True
+            st.session_state.user = user
+            st.success(f"✅ Welcome back {user['username']}!")
 
 # Detect query param for auto-login
 token_param = st.experimental_get_query_params().get("login_token", [None])[0] if st.experimental_get_query_params() else None
