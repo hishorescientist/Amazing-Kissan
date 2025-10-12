@@ -1,132 +1,16 @@
+# ai_assistant.py
 import streamlit as st
 import requests
-import json
 from datetime import datetime
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from langdetect import detect
+from utils import init_ai_sheet, save_chat
 
-# ------------------- GOOGLE SHEET SETUP -------------------
-SCOPE = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-@st.cache_resource(show_spinner=False)
-def connect_google_sheet():
-    try:
-        creds_json = st.secrets["google"]["creds"]
-        creds_dict = json.loads(creds_json)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        client = gspread.authorize(creds)
-        return client.open("User").worksheet("ai data")
-    except Exception as e:
-        st.warning(f"⚠️ Google Sheet connection failed: {e}")
-        return None
-
-sheet = connect_google_sheet()
-GOOGLE_SHEET_ENABLED = sheet is not None
+# Initialize AI sheet
+ai_sheet = init_ai_sheet()
+GOOGLE_SHEET_ENABLED = ai_sheet is not None
 
 # ------------------- HELPER FUNCTIONS -------------------
-def detect_language(text):
-    try:
-        return detect(text)
-    except:
-        return "en"
-
-def load_user_chats(username):
-    """Load all chats for a username from Google Sheet"""
-    if not GOOGLE_SHEET_ENABLED:
-        return {}
-    try:
-        rows = sheet.get_all_records()
-        user_chats = {}
-        for row in rows:
-            if str(row.get("username", "")).strip().lower() == username.strip().lower():
-                topic = row.get("topic", "Untitled").strip()
-                user_chats.setdefault(topic, []).append({
-                    "timestamp": row.get("timestamp", ""),
-                    "question": row.get("question", ""),
-                    "answer": row.get("answer", "")
-                })
-        return user_chats
-    except Exception as e:
-        st.warning(f"⚠️ Failed to load chats: {e}")
-        return {}
-
-def update_topic(messages, existing_topics):
-    """Generate a dynamic topic based on recent messages"""
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key or not messages:
-        return None
-
-    chat_text = "\n".join([f"Q: {m['question']}\nA: {m['answer']}" for m in messages[-5:]])
-    prompt = f"Provide a concise 3-5 word English topic summarizing this conversation:\n{chat_text}"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    data = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant who outputs English topics only."},
-            {"role": "user", "content": prompt}
-        ]
-    }
-
-    try:
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=15)
-        if resp.status_code == 200:
-            topic = resp.json()["choices"][0]["message"]["content"].strip()
-            for existing in existing_topics:
-                if topic.lower() in existing.lower() or existing.lower() in topic.lower():
-                    return existing
-            return topic
-    except:
-        pass
-    return None
-
-def save_chat(username, topic, question, answer):
-    """Append a chat to Google Sheet"""
-    if not GOOGLE_SHEET_ENABLED:
-        return
-    try:
-        sheet.append_row([
-            username,
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            topic,
-            question,
-            answer
-        ])
-    except Exception as e:
-        st.warning(f"⚠️ Failed to save chat: {e}")
-
-def generate_topic(question, answer, existing_topics):
-    """Generate a short topic from question and answer"""
-    api_key = st.secrets.get("GROQ_API_KEY")
-    prompt = f"Provide a short 3-5 word topic in English summarizing this chat:\nQ: {question}\nA: {answer}"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"} if api_key else {}
-    data = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant who outputs English topics only."},
-            {"role": "user", "content": prompt}
-        ]
-    }
-
-    topic = "New Chat"
-    if api_key:
-        try:
-            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=15)
-            if resp.status_code == 200:
-                topic = resp.json()["choices"][0]["message"]["content"].strip()
-        except:
-            pass
-
-    for existing in existing_topics:
-        if topic.lower() in existing.lower() or existing.lower() in topic.lower():
-            return existing
-    return topic
-
 def ask_ai(question, history):
-    """Ask AI using Groq API"""
+    """Send question to AI via Groq API"""
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
         return "❌ Missing API Key", "None"
@@ -143,7 +27,12 @@ def ask_ai(question, history):
     for model in models:
         data = {"model": model, "messages": conversation}
         try:
-            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=30)
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
             if resp.status_code == 200:
                 answer = resp.json()["choices"][0]["message"]["content"].strip()
                 return answer, model
@@ -151,21 +40,38 @@ def ask_ai(question, history):
             continue
     return "❌ AI request failed", "None"
 
+
 # ------------------- STREAMLIT APP -------------------
 def app():
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")
 
-    # Session defaults
+    # Ensure session defaults
     st.session_state.setdefault("ai_mode", "guest")
     st.session_state.setdefault("current_topic", None)
     st.session_state.setdefault("ai_history", [])
     st.session_state.setdefault("user_chats", {})
+    st.session_state.setdefault("guest_chats", {})
 
     username = st.session_state.user["username"] if st.session_state.get("logged_in") else "Guest"
 
     # Load old chats once
     if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED and not st.session_state.user_chats:
-        st.session_state.user_chats = load_user_chats(username)
+        try:
+            rows = ai_sheet.get_all_records()
+            user_chats = {}
+            for row in rows:
+                if row.get("username") == username:
+                    topic = row.get("topic", "Untitled")
+                    if topic not in user_chats:
+                        user_chats[topic] = []
+                    user_chats[topic].append({
+                        "timestamp": row.get("timestamp", ""),
+                        "question": row.get("question", ""),
+                        "answer": row.get("answer", "")
+                    })
+            st.session_state.user_chats = user_chats
+        except:
+            st.warning("⚠️ Failed to load user chats.")
 
     # Old chat selection
     if st.session_state.get("logged_in") and st.session_state.user_chats:
@@ -198,11 +104,12 @@ def app():
     # Chat input
     user_input = st.chat_input("💬 Type your question here (any language)...")
     if user_input:
+        # Determine topic
+        if st.session_state.current_topic is None:
+            st.session_state.current_topic = "New Chat"
         topic = st.session_state.current_topic
-        if not topic:
-            topic = generate_topic(user_input, "First message", list(st.session_state.user_chats.keys()))
-            st.session_state.current_topic = topic
 
+        # Get AI response
         answer, model = ask_ai(user_input, st.session_state.ai_history)
 
         chat_entry = {
@@ -211,15 +118,12 @@ def app():
             "answer": answer
         }
 
-        # Append chat
-        st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
+        # Append to session
         st.session_state.ai_history.append(chat_entry)
-
-        # Optional: update topic dynamically
-        if len(st.session_state.ai_history) >= 3:
-            new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
-            if new_topic:
-                st.session_state.current_topic = new_topic
+        if st.session_state.get("logged_in"):
+            st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
+        else:
+            st.session_state.guest_chats.setdefault(topic, []).append(chat_entry)
 
         # Display messages
         with st.chat_message("user"):
@@ -230,4 +134,4 @@ def app():
 
         # Save to Google Sheet if logged in
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
-            save_chat(username, st.session_state.current_topic, user_input, answer)
+            save_chat(username, topic, user_input, answer)
