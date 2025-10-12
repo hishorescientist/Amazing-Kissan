@@ -1,3 +1,4 @@
+# main.py
 import streamlit as st
 import json
 import gspread
@@ -5,7 +6,7 @@ import requests
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-from login import app as login_page, connect_google_sheet as connect_user_sheet_from_login, get_all_users
+from login import app as login_page, connect_google_sheet as connect_user_sheet
 from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
@@ -20,7 +21,7 @@ hide_menu = """
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
-    color: #FF5733;
+    color: #FF5733";
 }
 #MainMenu {visibility:hidden;}
 [data-testid="stToolbarActions"] {visibility:hidden;}
@@ -37,35 +38,16 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False,
-    "checked_local": False
+    "redirect_done": False,  # prevent rerun loop after login
+    "token_checked": False    # ensure JS auto-login runs once
 }
+
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- GOOGLE SHEET HELPERS -------------------
-SCOPE = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def connect_user_sheet():
-    try:
-        ws = connect_user_sheet_from_login()
-        if ws:
-            return ws
-    except Exception:
-        pass
-    try:
-        creds_json = st.secrets["google"]["creds"]
-        creds_dict = json.loads(creds_json)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        client = gspread.authorize(creds)
-        return client.open("User").worksheet("Sheet1")
-    except Exception as e:
-        st.warning(f"⚠️ Could not connect to User sheet: {e}")
-        return None
+# ------------------- GOOGLE SHEET -------------------
+SCOPE = ["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
 
 def connect_ai_sheet():
     try:
@@ -79,60 +61,54 @@ def connect_ai_sheet():
         return None
 
 ai_sheet = connect_ai_sheet()
-user_sheet = connect_user_sheet()
 
-# ------------------- AUTO-LOGIN (AppCreator24 safe) -------------------
-if not st.session_state.logged_in and not st.session_state.checked_local:
+# ------------------- AUTO-LOGIN via localStorage -------------------
+if not st.session_state.logged_in and not st.session_state.token_checked:
     components.html("""
-        <script>
-        const token = localStorage.getItem("login_token");
-        if (token) {
-            const url = new URL(window.location.href);
-            url.searchParams.set("auto_user", token);
-            window.location.replace(url.toString());
-        }
-        </script>
+    <script>
+    const token = localStorage.getItem("login_token");
+    if(token){
+        const url = new URL(window.location);
+        url.searchParams.set("login_token", token);
+        window.location.replace(url.toString());
+    }
+    </script>
     """, height=0)
-    st.session_state.checked_local = True
-    st.stop()  # stop until reload
+    st.session_state.token_checked = True
+    st.stop()  # stop until JS triggers reload
 
-# After reload, restore login from query param
-params = st.experimental_get_query_params()
-auto_user = params.get("auto_user", [None])[0]
-
-if auto_user and not st.session_state.logged_in and user_sheet:
-    users = get_all_users(user_sheet)
-    user = next((u for u in users if str(u.get("username")) == str(auto_user)), None)
-    if user:
-        st.session_state.logged_in = True
-        st.session_state.user = user
-        st.session_state.page = "Profile"
-        st.success(f"✅ Welcome back {user.get('username')}!")
-        # Remove query param
-        components.html("""
+# Detect query param for auto-login
+token_param = st.experimental_get_query_params().get("login_token", [None])[0] if st.experimental_get_query_params() else None
+if token_param and not st.session_state.logged_in:
+    sheet = connect_user_sheet()
+    if sheet:
+        users = sheet.get_all_records()
+        user = next((u for u in users if u["username"]==token_param), None)
+        if user:
+            st.session_state.logged_in = True
+            st.session_state.user = user
+            st.success(f"✅ Welcome back {user['username']}!")
+            # remove param to prevent reload loop
+            components.html("""
             <script>
-            const url = new URL(window.location.href);
-            url.searchParams.delete("auto_user");
+            const url = new URL(window.location);
+            url.searchParams.delete('login_token');
             window.history.replaceState({}, document.title, url.toString());
             </script>
-        """, height=0)
-        st.rerun()
+            """, height=0)
 
-# ------------------- SIDEBAR NAVIGATION -------------------
+# ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
 main_menu = ["Home", "About", "AI Assistant", "Contact"]
-if not st.session_state.logged_in:
-    main_menu.append("Login")
-else:
-    main_menu.append("Profile")
+main_menu.append("Profile" if st.session_state.logged_in else "Login")
 
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.rerun()
+        st.experimental_rerun()
 
-# ------------------- AI ASSISTANT OPTIONS -------------------
+# ------------------- AI Assistant Options -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
@@ -140,14 +116,14 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.rerun()
+        st.experimental_rerun()
 
     if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.rerun()
+        st.experimental_rerun()
 
     # Load old chats for logged-in users
     if st.session_state.logged_in and st.session_state.user:
@@ -155,16 +131,16 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             try:
                 rows = ai_sheet.get_all_records()
                 user_chats = {}
-                username = st.session_state.user.get("username", "")
+                username = st.session_state.user.get("username","")
                 for row in rows:
-                    if row.get("username") == username:
-                        topic = row.get("topic", "Untitled")
+                    if row.get("username")==username:
+                        topic = row.get("topic","Untitled")
                         if topic not in user_chats:
                             user_chats[topic] = []
                         user_chats[topic].append({
-                            "timestamp": row.get("timestamp", ""),
-                            "question": row.get("question", ""),
-                            "answer": row.get("answer", "")
+                            "timestamp": row.get("timestamp",""),
+                            "question": row.get("question",""),
+                            "answer": row.get("answer","")
                         })
                 st.session_state.user_chats = user_chats
             except Exception as e:
@@ -172,36 +148,28 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
 
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
+
             def _set_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic
-                st.session_state.ai_history = st.session_state.user_chats.get(
-                    st.session_state.current_topic, []
-                )
+                st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic,[])
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
 
-            st.selectbox(
-                "📚 Select a saved chat:",
-                topics[::-1],
-                key="selected_old_topic",
-                on_change=_set_topic
-            )
+            st.selectbox("📚 Select a saved chat:", topics[::-1], key="selected_old_topic", on_change=_set_topic)
 
-# ------------------- AGRI NEWS -------------------
+# ------------------- Agri News Sidebar -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
-
 query = st.sidebar.text_input("Keyword", value="agriculture")
 
 @st.cache_data(ttl=600)
 def get_agri_news(q):
     try:
-        api_key = st.secrets.get("NEWS_API_KEY", "")
-        if not api_key:
-            return []
+        api_key = st.secrets.get("NEWS_API_KEY","")
+        if not api_key: return []
         url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
         res = requests.get(url).json()
-        return res.get("articles", [])
+        return res.get("articles",[])
     except Exception:
         return []
 
@@ -211,12 +179,8 @@ for n in get_agri_news(query):
     st.sidebar.markdown("---")
 
 # ------------------- PAGE ROUTING -------------------
-if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
-    st.session_state.page = "Profile"
-    st.session_state.redirect_done = True
-    st.rerun()
-
 page = st.session_state.page
+
 if page == "Home":
     home_page()
 elif page == "About":
