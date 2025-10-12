@@ -1,173 +1,173 @@
 import streamlit as st
-import hashlib
 import json
 import gspread
+import requests
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-# ------------------- GOOGLE SHEET -------------------
+from login import app as login_page, connect_google_sheet as connect_user_sheet_from_login
+from profile import app as profile_page
+from ai_assistant import app as ai_page
+from home import app as home_page
+from about import app as about_page
+from contact import app as contact_page
+
+# ------------------- PAGE CONFIG -------------------
+st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
+
+hide_menu = """
+<style>
+[data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
+    content: "🛠️";
+    font-size: 20px;
+    color: #FF5733";
+}
+#MainMenu {visibility:hidden;}
+[data-testid="stToolbarActions"] {visibility:hidden;}
+</style>
+"""
+st.markdown(hide_menu, unsafe_allow_html=True)
+
+# ------------------- SESSION STATE -------------------
+default_state = {
+    "page": "Home",
+    "logged_in": False,
+    "user": None,
+    "ai_history": [],
+    "ai_mode": "guest",
+    "current_topic": None,
+    "user_chats": {},
+    "redirect_done": False,  # prevents rerun loop after login
+    "local_auto_checked": False  # prevents repeated JS injection
+}
+for k, v in default_state.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ------------------- GOOGLE SHEETS -------------------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-@st.cache_resource(show_spinner=False)
-def connect_google_sheet():
-    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
-        st.warning("⚠️ Google credentials missing in secrets.")
-        return None
+def connect_ai_sheet():
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)
-        return client.open("User").worksheet("Sheet1")
+        return client.open("User").worksheet("ai data")
     except Exception as e:
-        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        st.warning(f"⚠️ Could not connect to AI sheet: {e}")
         return None
 
-# ------------------- AUTH -------------------
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+ai_sheet = connect_ai_sheet()
 
-def get_all_users(sheet):
-    if not sheet:
-        return []
+# ------------------- SIDEBAR MENU -------------------
+st.sidebar.title("🌿 Navigation")
+main_menu = ["Home", "About", "AI Assistant", "Contact"]
+if not st.session_state.logged_in:
+    main_menu.append("Login")
+else:
+    main_menu.append("Profile")
+
+for item in main_menu:
+    if st.sidebar.button(item, use_container_width=True):
+        st.session_state.page = item
+        st.session_state.redirect_done = False
+        st.rerun()
+
+# ------------------- AI ASSISTANT OPTIONS -------------------
+st.sidebar.markdown("---")
+with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
+    if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
+        st.session_state.ai_mode = "new"
+        st.session_state.current_topic = None
+        st.session_state.ai_history = []
+        st.session_state.page = "AI Assistant"
+        st.rerun()
+
+    if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
+        st.session_state.ai_mode = "guest"
+        st.session_state.current_topic = None
+        st.session_state.ai_history = []
+        st.session_state.page = "AI Assistant"
+        st.rerun()
+
+    if st.session_state.logged_in and st.session_state.user:
+        if not st.session_state.user_chats and ai_sheet:
+            try:
+                rows = ai_sheet.get_all_records()
+                user_chats = {}
+                username = st.session_state.user.get("username", "")
+                for row in rows:
+                    if row.get("username") == username:
+                        topic = row.get("topic", "Untitled")
+                        if topic not in user_chats:
+                            user_chats[topic] = []
+                        user_chats[topic].append({
+                            "timestamp": row.get("timestamp", ""),
+                            "question": row.get("question", ""),
+                            "answer": row.get("answer", "")
+                        })
+                st.session_state.user_chats = user_chats
+            except Exception as e:
+                st.warning(f"⚠️ Failed to load chats: {e}")
+
+        if st.session_state.user_chats:
+            topics = list(st.session_state.user_chats.keys())
+            def _set_topic():
+                st.session_state.current_topic = st.session_state.selected_old_topic
+                st.session_state.ai_history = st.session_state.user_chats.get(
+                    st.session_state.current_topic, []
+                )
+                st.session_state.ai_mode = "old"
+                st.session_state.page = "AI Assistant"
+            st.selectbox(
+                "📚 Select a saved chat:",
+                topics[::-1],
+                key="selected_old_topic",
+                on_change=_set_topic
+            )
+
+# ------------------- Agri News Sidebar -------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("📰 Agri News")
+query = st.sidebar.text_input("Keyword", value="agriculture")
+
+@st.cache_data(ttl=600)
+def get_agri_news(q):
     try:
-        return sheet.get_all_records()
+        api_key = st.secrets.get("NEWS_API_KEY", "")
+        if not api_key:
+            return []
+        url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
+        res = requests.get(url).json()
+        return res.get("articles", [])
     except Exception:
         return []
 
-def save_user(sheet, user):
-    if not sheet:
-        return False
-    users = get_all_users(sheet)
-    usernames = [u["username"] for u in users]
-    row = [
-        user.get("username",""),
-        user.get("password",""),
-        user.get("name",""),
-        user.get("email",""),
-        user.get("phone",""),
-        user.get("address",""),
-        user.get("dob","")
-    ]
-    try:
-        if user["username"] in usernames:
-            idx = usernames.index(user["username"]) + 2
-            sheet.update(f"A{idx}:G{idx}", [row])
-        else:
-            sheet.append_row(row)
-        return True
-    except Exception as e:
-        st.error(f"❌ Error saving user: {e}")
-        return False
+for n in get_agri_news(query):
+    st.sidebar.markdown(f"**[{n['title']}]({n['url']})**")
+    st.sidebar.caption(n["source"]["name"])
+    st.sidebar.markdown("---")
 
-def verify_user(sheet, username, password):
-    hashed = hash_password(password)
-    users = get_all_users(sheet)
-    return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
+# ------------------- PAGE ROUTING -------------------
+if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
+    st.session_state.page = "Profile"
+    st.session_state.redirect_done = True
+    st.rerun()
 
-# ------------------- LOGIN PAGE -------------------
-def app():
-    sheet = connect_google_sheet()
-    st.session_state.setdefault("logged_in", False)
-    st.session_state.setdefault("user", None)
-    st.session_state.setdefault("local_auto_checked", False)
-
-    # -------- STEP 1: Auto-login from localStorage (only once) --------
-    if not st.session_state.logged_in and not st.session_state.local_auto_checked:
-        components.html("""
-        <script>
-        const user = localStorage.getItem("logged_in_user");
-        if (user) {
-            const url = new URL(window.location);
-            url.searchParams.set("user", user);
-            window.location.replace(url.toString());
-        }
-        </script>
-        """, height=0)
-        st.session_state.local_auto_checked = True
-        st.stop()  # stop further execution until page reloads
-
-    # -------- STEP 2: Check query param after reload --------
-    query_user = st.query_params.get("user")
-    if isinstance(query_user, list):
-        query_user = query_user[0]
-
-    if query_user and not st.session_state.logged_in:
-        users = get_all_users(sheet)
-        user = next((u for u in users if str(u.get("username")) == str(query_user)), None)
-        if user:
-            st.session_state.logged_in = True
-            st.session_state.user = user
-            st.session_state.page = "Profile"
-            # Clear the query param
-            components.html("""
-            <script>
-            const url = new URL(window.location);
-            url.searchParams.delete('user');
-            window.history.replaceState({}, document.title, url.toString());
-            </script>
-            """, height=0)
-            st.success(f"✅ Welcome back {user.get('username')}!")
-            st.rerun()
-
-    # -------- STEP 3: Login/Register UI --------
-    if not st.session_state.logged_in:
-        st.title("🔐 Login / Register")
-        login_tab, register_tab = st.tabs(["Login", "Register"])
-
-        with login_tab:
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Login", use_container_width=True):
-                if not username or not password:
-                    st.warning("⚠️ Fill in both fields.")
-                else:
-                    user = verify_user(sheet, username, password)
-                    if user:
-                        st.session_state.logged_in = True
-                        st.session_state.user = user
-                        st.session_state.page = "Profile"
-                        # Save localStorage
-                        components.html(f"""
-                        <script>
-                        localStorage.setItem("logged_in_user", "{username}");
-                        </script>
-                        """, height=0)
-                        st.success(f"✅ Welcome {username}! Redirecting...")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid username or password.")
-
-        with register_tab:
-            new_user = st.text_input("New Username")
-            new_pass = st.text_input("New Password", type="password")
-            if st.button("Register", use_container_width=True):
-                if not new_user or not new_pass:
-                    st.error("❌ Fill all fields.")
-                else:
-                    users = get_all_users(sheet)
-                    if any(u.get("username")==new_user.strip() for u in users):
-                        st.warning("⚠️ Username already exists.")
-                    else:
-                        user_dict = {
-                            "username": new_user.strip(),
-                            "password": hash_password(new_pass.strip()),
-                            "name":"",
-                            "email":"",
-                            "phone":"",
-                            "address":"",
-                            "dob":""
-                        }
-                        if save_user(sheet, user_dict):
-                            st.success("✅ Registration successful! You can now log in.")
-
-    # -------- STEP 4: Logout --------
-    if st.session_state.logged_in and st.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.user = None
-        components.html("""<script>localStorage.removeItem("logged_in_user");</script>""", height=0)
-        st.success("👋 Logged out successfully.")
-        st.rerun()
+page = st.session_state.page
+if page == "Home":
+    home_page()
+elif page == "About":
+    about_page()
+elif page == "AI Assistant":
+    ai_page()
+elif page == "Contact":
+    contact_page()
+elif page == "Login":
+    login_page()
+elif page == "Profile":
+    profile_page()

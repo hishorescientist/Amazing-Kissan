@@ -20,7 +20,7 @@ hide_menu = """
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
-    color: #FF5733;
+    color: #FF5733";
 }
 #MainMenu {visibility:hidden;}
 [data-testid="stToolbarActions"] {visibility:hidden;}
@@ -37,39 +37,20 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False  # prevents rerun loop after login
+    "redirect_done": False,  # prevents rerun loop after login
+    "local_auto_checked": False  # prevents repeated JS injection
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- GOOGLE SHEET HELPERS -------------------
+# ------------------- GOOGLE SHEETS -------------------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-def connect_user_sheet():
-    """Connect to the User sheet (try from login.py first, fallback to direct)"""
-    try:
-        ws = connect_user_sheet_from_login()
-        if ws:
-            return ws
-    except Exception:
-        pass
-
-    try:
-        creds_json = st.secrets["google"]["creds"]
-        creds_dict = json.loads(creds_json)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        client = gspread.authorize(creds)
-        return client.open("User").worksheet("Sheet1")
-    except Exception as e:
-        st.warning(f"⚠️ Could not connect to User sheet: {e}")
-        return None
-
 def connect_ai_sheet():
-    """Connect to AI data sheet"""
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
@@ -82,72 +63,9 @@ def connect_ai_sheet():
 
 ai_sheet = connect_ai_sheet()
 
-# ------------------- AUTO-LOGIN using localStorage + query param -------------------
-params = st.query_params
-auto_user = params.get("auto_user")
-if isinstance(auto_user, list):
-    auto_user = auto_user[0]
-
-# Step 1: inject JavaScript to append ?auto_user from localStorage
-if not st.session_state.logged_in and not auto_user and not st.session_state.redirect_done:
-    components.html("""
-    <script>
-    try {
-        const user = localStorage.getItem("logged_in_user");
-        if (user) {
-            const url = new URL(window.location);
-            url.searchParams.set("auto_user", user);
-            window.location.replace(url.toString());
-        }
-    } catch(e) { console.warn("LocalStorage error", e); }
-    </script>
-    """, height=0)
-
-# Step 2: restore session if ?auto_user param exists
-if auto_user and not st.session_state.logged_in:
-    user_sheet = connect_user_sheet()
-    if user_sheet:
-        try:
-            users = user_sheet.get_all_records()
-            user = next((u for u in users if str(u.get("username")) == str(auto_user)), None)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.session_state.page = "Profile"
-                st.session_state.redirect_done = True
-                st.success(f"✅ Welcome back {user.get('username')}! Restoring session...")
-                # Remove query param from URL after successful login
-                components.html("""
-                <script>
-                const url = new URL(window.location);
-                url.searchParams.delete('auto_user');
-                window.history.replaceState({}, document.title, url.toString());
-                </script>
-                """, height=0)
-                st.rerun()
-            else:
-                # Clear param if no user found
-                components.html("""
-                <script>
-                const url = new URL(window.location);
-                url.searchParams.delete('auto_user');
-                window.history.replaceState({}, document.title, url.toString());
-                </script>
-                """, height=0)
-        except Exception as e:
-            st.warning(f"⚠️ Auto-login failed: {e}")
-            components.html("""
-            <script>
-            const url = new URL(window.location);
-            url.searchParams.delete('auto_user');
-            window.history.replaceState({}, document.title, url.toString());
-            </script>
-            """, height=0)
-
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
 main_menu = ["Home", "About", "AI Assistant", "Contact"]
-
 if not st.session_state.logged_in:
     main_menu.append("Login")
 else:
@@ -185,7 +103,9 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 for row in rows:
                     if row.get("username") == username:
                         topic = row.get("topic", "Untitled")
-                        user_chats.setdefault(topic, []).append({
+                        if topic not in user_chats:
+                            user_chats[topic] = []
+                        user_chats[topic].append({
                             "timestamp": row.get("timestamp", ""),
                             "question": row.get("question", ""),
                             "answer": row.get("answer", "")
@@ -196,7 +116,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
 
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
-
             def _set_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic
                 st.session_state.ai_history = st.session_state.user_chats.get(
@@ -204,7 +123,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
-
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
@@ -215,7 +133,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
 # ------------------- Agri News Sidebar -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
-
 query = st.sidebar.text_input("Keyword", value="agriculture")
 
 @st.cache_data(ttl=600)
@@ -242,7 +159,6 @@ if st.session_state.logged_in and st.session_state.page == "Login" and not st.se
     st.rerun()
 
 page = st.session_state.page
-
 if page == "Home":
     home_page()
 elif page == "About":

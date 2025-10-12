@@ -1,4 +1,3 @@
-# main.py
 import streamlit as st
 import json
 import gspread
@@ -45,24 +44,20 @@ for k, v in default_state.items():
         st.session_state[k] = v
 
 # ------------------- GOOGLE SHEET HELPERS -------------------
-# If you already have connect_google_sheet in login.py that returns the User sheet,
-# we try to reuse it. Otherwise use this as fallback.
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
 def connect_user_sheet():
-    # try to use the function imported from login.py
+    """Connect to the User sheet (try from login.py first, fallback to direct)"""
     try:
-        # connect_user_sheet_from_login should be the function that connects to the 'User' sheet
         ws = connect_user_sheet_from_login()
         if ws:
             return ws
     except Exception:
         pass
 
-    # fallback (attempt to open 'User' -> 'Sheet1')
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
@@ -70,12 +65,11 @@ def connect_user_sheet():
         client = gspread.authorize(creds)
         return client.open("User").worksheet("Sheet1")
     except Exception as e:
-        # Not fatal here; return None and let calling code handle it
         st.warning(f"⚠️ Could not connect to User sheet: {e}")
         return None
 
 def connect_ai_sheet():
-    # your previous ai data connection function (used for chats)
+    """Connect to AI data sheet"""
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
@@ -89,12 +83,13 @@ def connect_ai_sheet():
 ai_sheet = connect_ai_sheet()
 
 # ------------------- AUTO-LOGIN using localStorage + query param -------------------
-# 1) If not logged in and we don't yet have ?auto_user in the URL, run JS to copy localStorage -> ?auto_user and reload
-params = st.query_params()
-auto_user = params.get("auto_user", [None])[0]
+params = st.query_params
+auto_user = params.get("auto_user")
+if isinstance(auto_user, list):
+    auto_user = auto_user[0]
 
+# Step 1: inject JavaScript to append ?auto_user from localStorage
 if not st.session_state.logged_in and not auto_user and not st.session_state.redirect_done:
-    # This script will reload page with ?auto_user=<username> if localStorage contains logged_in_user
     components.html("""
     <script>
     try {
@@ -102,16 +97,13 @@ if not st.session_state.logged_in and not auto_user and not st.session_state.red
         if (user) {
             const url = new URL(window.location);
             url.searchParams.set("auto_user", user);
-            // use replace to avoid adding history entry
             window.location.replace(url.toString());
         }
-    } catch(e) {
-        // nothing
-    }
+    } catch(e) { console.warn("LocalStorage error", e); }
     </script>
     """, height=0)
 
-# 2) If query param exists, attempt server-side restore
+# Step 2: restore session if ?auto_user param exists
 if auto_user and not st.session_state.logged_in:
     user_sheet = connect_user_sheet()
     if user_sheet:
@@ -124,7 +116,7 @@ if auto_user and not st.session_state.logged_in:
                 st.session_state.page = "Profile"
                 st.session_state.redirect_done = True
                 st.success(f"✅ Welcome back {user.get('username')}! Restoring session...")
-                # Remove the auto_user param from the URL to avoid loops
+                # Remove query param from URL after successful login
                 components.html("""
                 <script>
                 const url = new URL(window.location);
@@ -132,9 +124,9 @@ if auto_user and not st.session_state.logged_in:
                 window.history.replaceState({}, document.title, url.toString());
                 </script>
                 """, height=0)
-                st.experimental_rerun()
+                st.rerun()
             else:
-                # If user not found, remove param to prevent infinite loop
+                # Clear param if no user found
                 components.html("""
                 <script>
                 const url = new URL(window.location);
@@ -144,7 +136,6 @@ if auto_user and not st.session_state.logged_in:
                 """, height=0)
         except Exception as e:
             st.warning(f"⚠️ Auto-login failed: {e}")
-            # remove param anyway
             components.html("""
             <script>
             const url = new URL(window.location);
@@ -194,9 +185,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 for row in rows:
                     if row.get("username") == username:
                         topic = row.get("topic", "Untitled")
-                        if topic not in user_chats:
-                            user_chats[topic] = []
-                        user_chats[topic].append({
+                        user_chats.setdefault(topic, []).append({
                             "timestamp": row.get("timestamp", ""),
                             "question": row.get("question", ""),
                             "answer": row.get("answer", "")
@@ -223,7 +212,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=_set_topic
             )
 
-# ------------------- Optional: Agri News Sidebar -------------------
+# ------------------- Agri News Sidebar -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
 
