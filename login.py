@@ -58,7 +58,7 @@ def app():
     sheet = connect_google_sheet()
 
     # --- STEP 1: Detect localStorage token ---
-    token_param = st.experimental_get_query_params().get("login_token", [None])[0]
+    token_param = st.query_params().get("login_token", [None])[0]
 
     if not st.session_state.logged_in and not token_param:
         # Ask JS to read localStorage and reload with query param

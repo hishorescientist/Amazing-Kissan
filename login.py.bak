@@ -110,7 +110,7 @@ def app():
                         # save token
                         components.html(f"""<script>localStorage.setItem("login_token", "{username}");</script>""", height=0)
                         st.success(f"✅ Logged in as {username}")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("❌ Invalid username/password")
 
