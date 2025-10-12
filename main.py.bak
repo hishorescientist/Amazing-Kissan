@@ -3,10 +3,10 @@ import streamlit as st
 import json
 import gspread
 import requests
-import os
 from oauth2client.service_account import ServiceAccountCredentials
+import streamlit.components.v1 as components
 
-from login import app as login_page
+from login import app as login_page, connect_google_sheet as connect_user_sheet_from_login
 from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
@@ -38,53 +38,44 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False
+    "redirect_done": False  # prevents rerun loop after login
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- AUTO LOGIN (using local log file) -------------------
-LOG_FILE = "user_log.json"
-
-def save_log(user_data):
-    """Save login info to local file for auto-login"""
-    try:
-        with open(LOG_FILE, "w") as f:
-            json.dump(user_data, f)
-    except Exception as e:
-        st.warning(f"⚠️ Could not save log: {e}")
-
-def load_log():
-    """Load saved login info"""
-    if os.path.exists(LOG_FILE):
-        try:
-            with open(LOG_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return None
-    return None
-
-def clear_log():
-    """Delete saved login info"""
-    if os.path.exists(LOG_FILE):
-        os.remove(LOG_FILE)
-
-# Attempt auto-login on app load
-if not st.session_state.logged_in:
-    saved_user = load_log()
-    if saved_user:
-        st.session_state.logged_in = True
-        st.session_state.user = saved_user
-        st.session_state.page = "Profile"
-
-# ------------------- GOOGLE SHEET SETUP -------------------
+# ------------------- GOOGLE SHEET HELPERS -------------------
+# If you already have connect_google_sheet in login.py that returns the User sheet,
+# we try to reuse it. Otherwise use this as fallback.
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-def connect_google_sheet():
+def connect_user_sheet():
+    # try to use the function imported from login.py
+    try:
+        # connect_user_sheet_from_login should be the function that connects to the 'User' sheet
+        ws = connect_user_sheet_from_login()
+        if ws:
+            return ws
+    except Exception:
+        pass
+
+    # fallback (attempt to open 'User' -> 'Sheet1')
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("Sheet1")
+    except Exception as e:
+        # Not fatal here; return None and let calling code handle it
+        st.warning(f"⚠️ Could not connect to User sheet: {e}")
+        return None
+
+def connect_ai_sheet():
+    # your previous ai data connection function (used for chats)
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
@@ -92,10 +83,75 @@ def connect_google_sheet():
         client = gspread.authorize(creds)
         return client.open("User").worksheet("ai data")
     except Exception as e:
-        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        st.warning(f"⚠️ Could not connect to AI sheet: {e}")
         return None
 
-sheet = connect_google_sheet()
+ai_sheet = connect_ai_sheet()
+
+# ------------------- AUTO-LOGIN using localStorage + query param -------------------
+# 1) If not logged in and we don't yet have ?auto_user in the URL, run JS to copy localStorage -> ?auto_user and reload
+params = st.experimental_get_query_params()
+auto_user = params.get("auto_user", [None])[0]
+
+if not st.session_state.logged_in and not auto_user and not st.session_state.redirect_done:
+    # This script will reload page with ?auto_user=<username> if localStorage contains logged_in_user
+    components.html("""
+    <script>
+    try {
+        const user = localStorage.getItem("logged_in_user");
+        if (user) {
+            const url = new URL(window.location);
+            url.searchParams.set("auto_user", user);
+            // use replace to avoid adding history entry
+            window.location.replace(url.toString());
+        }
+    } catch(e) {
+        // nothing
+    }
+    </script>
+    """, height=0)
+
+# 2) If query param exists, attempt server-side restore
+if auto_user and not st.session_state.logged_in:
+    user_sheet = connect_user_sheet()
+    if user_sheet:
+        try:
+            users = user_sheet.get_all_records()
+            user = next((u for u in users if str(u.get("username")) == str(auto_user)), None)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.user = user
+                st.session_state.page = "Profile"
+                st.session_state.redirect_done = True
+                st.success(f"✅ Welcome back {user.get('username')}! Restoring session...")
+                # Remove the auto_user param from the URL to avoid loops
+                components.html("""
+                <script>
+                const url = new URL(window.location);
+                url.searchParams.delete('auto_user');
+                window.history.replaceState({}, document.title, url.toString());
+                </script>
+                """, height=0)
+                st.experimental_rerun()
+            else:
+                # If user not found, remove param to prevent infinite loop
+                components.html("""
+                <script>
+                const url = new URL(window.location);
+                url.searchParams.delete('auto_user');
+                window.history.replaceState({}, document.title, url.toString());
+                </script>
+                """, height=0)
+        except Exception as e:
+            st.warning(f"⚠️ Auto-login failed: {e}")
+            # remove param anyway
+            components.html("""
+            <script>
+            const url = new URL(window.location);
+            url.searchParams.delete('auto_user');
+            window.history.replaceState({}, document.title, url.toString());
+            </script>
+            """, height=0)
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
@@ -130,9 +186,9 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.rerun()
 
     if st.session_state.logged_in and st.session_state.user:
-        if not st.session_state.user_chats and sheet:
+        if not st.session_state.user_chats and ai_sheet:
             try:
-                rows = sheet.get_all_records()
+                rows = ai_sheet.get_all_records()
                 user_chats = {}
                 username = st.session_state.user.get("username", "")
                 for row in rows:
@@ -207,12 +263,6 @@ elif page == "AI Assistant":
 elif page == "Contact":
     contact_page()
 elif page == "Login":
-    user = login_page()
-    if user:
-        st.session_state.logged_in = True
-        st.session_state.user = user
-        save_log(user)  # Save login info for next time
-        st.session_state.page = "Profile"
-        st.rerun()
+    login_page()
 elif page == "Profile":
     profile_page()

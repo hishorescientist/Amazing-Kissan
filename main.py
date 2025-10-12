@@ -90,7 +90,7 @@ ai_sheet = connect_ai_sheet()
 
 # ------------------- AUTO-LOGIN using localStorage + query param -------------------
 # 1) If not logged in and we don't yet have ?auto_user in the URL, run JS to copy localStorage -> ?auto_user and reload
-params = st.experimental_get_query_params()
+params = st.query_params()
 auto_user = params.get("auto_user", [None])[0]
 
 if not st.session_state.logged_in and not auto_user and not st.session_state.redirect_done:
