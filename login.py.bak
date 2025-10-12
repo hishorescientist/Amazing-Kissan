@@ -28,6 +28,7 @@ def connect_google_sheet():
         st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
         return None
 
+
 # --------------------------------------------------------
 # 🔐 AUTH FUNCTIONS
 # --------------------------------------------------------
@@ -72,6 +73,7 @@ def verify_user(sheet, username, password):
     users = get_all_users(sheet)
     return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
 
+
 # --------------------------------------------------------
 # 🧑 LOGIN PAGE
 # --------------------------------------------------------
@@ -79,26 +81,41 @@ def app():
     sheet = connect_google_sheet()
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
-    # --- Load stored user from browser localStorage ---
-    components.html("""
-        <script>
-        const storedUser = localStorage.getItem("logged_in_user");
-        if (storedUser) {
-            // Automatically tell Streamlit to rerun
-            window.parent.postMessage({type: "auto_login", user: storedUser}, "*");
-        }
-        </script>
-    """, height=0)
-    
+
+    # --- STEP 1: Check for existing localStorage user ---
+    stored_username = st.query_params.get("user", [None])[0] if hasattr(st, "query_params") else None
+    if not stored_username:
+        components.html("""
+            <script>
+            const user = localStorage.getItem("logged_in_user");
+            if (user) {
+                // Add query parameter and reload Streamlit app
+                const url = new URL(window.location);
+                url.searchParams.set("user", user);
+                window.location.href = url.toString();
+            }
+            </script>
+        """, height=0)
+
+    # --- STEP 2: Auto login if username found in query params ---
+    if stored_username and not st.session_state.logged_in:
+        users = get_all_users(sheet)
+        user = next((u for u in users if u["username"] == stored_username), None)
+        if user:
+            st.session_state.logged_in = True
+            st.session_state.user = user
+            st.session_state.page = "Profile"
+            st.success(f"✅ Welcome back {user['username']}!")
+            st.rerun()
+
+    # --- STEP 3: Login/Register ---
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
         login_tab, register_tab = st.tabs(["Login", "Register"])
 
-        # ---------------- LOGIN TAB ----------------
         with login_tab:
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
             if st.button("Login", use_container_width=True):
                 if not username or not password:
                     st.warning("⚠️ Fill in both fields.")
@@ -108,24 +125,19 @@ def app():
                         st.session_state.logged_in = True
                         st.session_state.user = user
                         st.session_state.page = "Profile"
-
-                        # Store login in localStorage
                         components.html(f"""
                             <script>
                             localStorage.setItem("logged_in_user", "{username}");
                             </script>
                         """, height=0)
-
-                        st.success(f"✅ Welcome {user['username']}! Redirecting to your profile...")
+                        st.success(f"✅ Welcome {user['username']}! Redirecting...")
                         st.rerun()
                     else:
                         st.error("❌ Invalid username or password.")
 
-        # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
             new_pass = st.text_input("New Password", type="password")
-
             if st.button("Register", use_container_width=True):
                 if not new_user or not new_pass:
                     st.error("❌ Fill all fields.")
@@ -146,11 +158,7 @@ def app():
                         if save_user(sheet, user_dict):
                             st.success("✅ Registration successful! You can now log in.")
 
-    else:
-        st.session_state.page = "Profile"
-        st.rerun()
-
-    # --- Add Logout Button (optional) ---
+    # --- STEP 4: Logout clears localStorage ---
     if st.session_state.logged_in and st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user = None
