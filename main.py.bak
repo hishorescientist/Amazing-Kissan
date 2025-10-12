@@ -54,7 +54,7 @@ for item in main_menu:
     if st.sidebar.button(item, use_container_width=True):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
@@ -64,14 +64,14 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
     if st.button("👤 Guest Chat", key="ai_guest"):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------- Agri News Sidebar -------------------
 st.sidebar.markdown("---")
