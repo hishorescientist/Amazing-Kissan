@@ -41,7 +41,7 @@ def app():
             window.history.replaceState({}, document.title, url.toString());
             </script>
             """, height=0)
-            st.experimental_rerun()
+            st.rerun()
 
     # --- STEP 3: Login / Register UI ---
     if not st.session_state.logged_in:
@@ -68,7 +68,7 @@ def app():
                         </script>
                         """, height=0)
                         st.success(f"✅ Welcome {user['username']}! Redirecting...")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("❌ Invalid username or password.")
 
@@ -102,4 +102,4 @@ def app():
         st.session_state.user = None
         components.html("""<script>localStorage.removeItem("login_user");</script>""", height=0)
         st.success("👋 Logged out successfully.")
-        st.experimental_rerun()
+        st.rerun()
