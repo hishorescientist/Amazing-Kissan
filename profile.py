@@ -1,9 +1,21 @@
 import streamlit as st
+import os
+import json
 from login import connect_google_sheet, save_user
 
 # --------------------------------------------------------
 # 👤 PROFILE PAGE
 # --------------------------------------------------------
+LOG_FILE = "user_log.json"  # Same name used in main.py
+
+def clear_log():
+    """Delete saved login info for security"""
+    if os.path.exists(LOG_FILE):
+        try:
+            os.remove(LOG_FILE)
+        except Exception as e:
+            st.warning(f"⚠️ Could not remove log file: {e}")
+
 def app():
     """User Profile Page."""
     st.title("👤 User Profile")
@@ -53,12 +65,15 @@ def app():
     # ----------------------------------------------------
     st.markdown("---")
     if st.button("🚪 Logout", use_container_width=True):
-       # Clear all session state related to user
+        # Clear session state
         for key in ["logged_in", "user", "current_topic", "ai_history", "user_chats", "guest_chats"]:
             if key in st.session_state:
                 del st.session_state[key]
-    
-    # Redirect to login page
+
+        # Delete auto-login log file
+        clear_log()
+
+        # Redirect to login page
         st.session_state.page = "Login"
         st.success("✅ Logged out successfully.")
         st.rerun()
