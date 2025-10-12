@@ -15,18 +15,19 @@ from contact import app as contact_page
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
-# Hide default Streamlit menu and toolbar, customize sidebar toggle
-st.markdown("""
+# Hide Streamlit menu & toolbar
+hide_menu = """
 <style>
+#MainMenu { visibility: hidden; }
+[data-testid="stToolbarActions"] { visibility: hidden; }
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
     color: #FF5733;
 }
-#MainMenu {visibility: hidden;}
-[data-testid="stToolbarActions"] {visibility: hidden;}
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(hide_menu, unsafe_allow_html=True)
 
 # ------------------- SESSION STATE -------------------
 default_state = {
@@ -37,88 +38,108 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "guest_chats": {},
-    "redirect_done": False
+    "redirect_done": False  # prevents rerun loop after login
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- GOOGLE SHEET SETUP -------------------
+# ------------------- GOOGLE SHEET CONNECTION -------------------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-def connect_google_sheet():
+def connect_google_sheet(sheet_name="ai data"):
     if "google" not in st.secrets or "creds" not in st.secrets["google"]:
         return None
     try:
-        creds_dict = json.loads(st.secrets["google"]["creds"])
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)
-        return client.open("User").worksheet("ai data")
+        return client.open("User").worksheet(sheet_name)
     except Exception as e:
         st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
         return None
 
-sheet = connect_google_sheet()
+sheet = connect_google_sheet("ai data")
 
-# ------------------- SIDEBAR NAVIGATION -------------------
+# ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home", "About", "AI Assistant", "Contact", "Login"]
+main_menu = ["Home", "About", "AI Assistant", "Contact"]
+if st.session_state.logged_in:
+    main_menu.append("Profile")
+else:
+    main_menu.append("Login")
+
 for item in main_menu:
-    if st.sidebar.button(item, use_container_width=True):
+    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
         st.session_state.page = item
         st.session_state.redirect_done = False
         st.rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
-with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
-    # New Chat
-    if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
-        st.session_state.ai_mode = "new"
-        st.session_state.current_topic = None
-        st.session_state.ai_history = []
-        st.session_state.page = "AI Assistant"
-        st.rerun()
+st.sidebar.subheader("⚙️ AI Assistant Options")
 
-    # Guest Chat
-    if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
-        st.session_state.ai_mode = "guest"
-        st.session_state.current_topic = None
-        st.session_state.ai_history = []
-        st.session_state.page = "AI Assistant"
-        st.rerun()
+# New Chat
+if st.sidebar.button("🆕 New Chat", key="ai_new_main"):
+    st.session_state.ai_mode = "new"
+    st.session_state.current_topic = "New Chat"
+    st.session_state.ai_history = []
+    st.session_state.page = "AI Assistant"
+    st.rerun()
 
-    # Load Old Chats (Logged-in Users)
-    if st.session_state.logged_in and st.session_state.user and sheet:
-        if not st.session_state.user_chats:
-            try:
-                rows = sheet.get_all_records()
-                user_chats = {}
-                username = st.session_state.user.get("username", "")
-                for row in rows:
-                    if row.get("username") == username:
-                        topic = row.get("topic", "Untitled")
-                        if topic not in user_chats:
-                            user_chats[topic] = []
-                        user_chats[topic].append({
-                            "timestamp": row.get("timestamp", ""),
-                            "question": row.get("question", ""),
-                            "answer": row.get("answer", "")
-                        })
-                st.session_state.user_chats = user_chats
-            except Exception as e:
-                st.warning(f"⚠️ Failed to load chats: {e}")
+# Guest Chat
+if st.sidebar.button("👤 Guest Chat", key="ai_guest_main"):
+    st.session_state.ai_mode = "guest"
+    st.session_state.current_topic = "New Chat"
+    st.session_state.ai_history = []
+    st.session_state.page = "AI Assistant"
+    st.rerun()
 
-        # Show current topic if any
-        if st.session_state.user_chats and st.session_state.current_topic is None:
-            st.session_state.current_topic = list(st.session_state.user_chats.keys())[0]
-            st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
+# Load old chats (logged-in only)
+if st.session_state.logged_in and st.session_state.user and sheet:
+    if not st.session_state.user_chats:
+        try:
+            rows = sheet.get_all_records()
+            user_chats = {}
+            username = st.session_state.user.get("username", "")
+            for row in rows:
+                if row.get("username") == username:
+                    topic = row.get("topic", "Untitled")
+                    if topic not in user_chats:
+                        user_chats[topic] = []
+                    user_chats[topic].append({
+                        "timestamp": row.get("timestamp", ""),
+                        "question": row.get("question", ""),
+                        "answer": row.get("answer", "")
+                    })
+            st.session_state.user_chats = user_chats
+        except Exception as e:
+            st.warning(f"⚠️ Failed to load chats: {e}")
 
-# ------------------- AGRO NEWS -------------------
+    if st.session_state.user_chats:
+        topics = list(st.session_state.user_chats.keys())
+
+        def set_old_topic():
+            st.session_state.current_topic = st.session_state.selected_old_topic_main
+            st.session_state.ai_history = st.session_state.user_chats.get(
+                st.session_state.current_topic, []
+            )
+            st.session_state.ai_mode = "old"
+            st.session_state.page = "AI Assistant"
+            st.rerun()
+
+        st.selectbox(
+            "📚 Select a saved chat:",
+            topics[::-1],
+            key="selected_old_topic_main",
+            on_change=set_old_topic
+        )
+
+# ------------------- OPTIONAL: Agri News -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
 query = st.sidebar.text_input("Keyword", value="agriculture")
@@ -132,7 +153,7 @@ def get_agri_news(q):
         url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
         res = requests.get(url).json()
         return res.get("articles", [])
-    except Exception:
+    except:
         return []
 
 for n in get_agri_news(query):
@@ -140,7 +161,7 @@ for n in get_agri_news(query):
     st.sidebar.caption(n["source"]["name"])
     st.sidebar.markdown("---")
 
-# ------------------- LOGIN REDIRECT -------------------
+# ------------------- AUTO-REDIRECT LOGIN → PROFILE -------------------
 if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
     st.session_state.page = "Profile"
     st.session_state.redirect_done = True
@@ -159,7 +180,4 @@ elif page == "Contact":
 elif page == "Login":
     login_page()
 elif page == "Profile":
-    if st.session_state.logged_in:
-        profile_page()
-    else:
-        st.warning("⚠️ Please log in to view your profile")
+    profile_page()

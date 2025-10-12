@@ -80,64 +80,64 @@ for item in main_menu:
         st.rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
+# ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ AI Assistant Options")
+with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
+    # New Chat
+    if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
+        st.session_state.ai_mode = "new"
+        st.session_state.current_topic = None
+        st.session_state.ai_history = []
+        st.session_state.page = "AI Assistant"
+        st.rerun()
 
-# New Chat
-if st.sidebar.button("🆕 New Chat", key="ai_new_main"):
-    st.session_state.ai_mode = "new"
-    st.session_state.current_topic = "New Chat"
-    st.session_state.ai_history = []
-    st.session_state.page = "AI Assistant"
-    st.rerun()
+    # Guest Chat
+    if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
+        st.session_state.ai_mode = "guest"
+        st.session_state.current_topic = None
+        st.session_state.ai_history = []
+        st.session_state.page = "AI Assistant"
+        st.rerun()
 
-# Guest Chat
-if st.sidebar.button("👤 Guest Chat", key="ai_guest_main"):
-    st.session_state.ai_mode = "guest"
-    st.session_state.current_topic = "New Chat"
-    st.session_state.ai_history = []
-    st.session_state.page = "AI Assistant"
-    st.rerun()
+    # Load old chats for logged-in user
+    if st.session_state.logged_in and st.session_state.user:
+        if not st.session_state.user_chats and sheet:
+            try:
+                rows = sheet.get_all_records()
+                user_chats = {}
+                username = st.session_state.user.get("username", "")
+                for row in rows:
+                    if row.get("username") == username:
+                        topic = row.get("topic", "Untitled")
+                        if topic not in user_chats:
+                            user_chats[topic] = []
+                        user_chats[topic].append({
+                            "timestamp": row.get("timestamp", ""),
+                            "question": row.get("question", ""),
+                            "answer": row.get("answer", "")
+                        })
+                st.session_state.user_chats = user_chats
+            except Exception as e:
+                st.warning(f"⚠️ Failed to load chats: {e}")
 
-# Load old chats (logged-in only)
-if st.session_state.logged_in and st.session_state.user and sheet:
-    if not st.session_state.user_chats:
-        try:
-            rows = sheet.get_all_records()
-            user_chats = {}
-            username = st.session_state.user.get("username", "")
-            for row in rows:
-                if row.get("username") == username:
-                    topic = row.get("topic", "Untitled")
-                    if topic not in user_chats:
-                        user_chats[topic] = []
-                    user_chats[topic].append({
-                        "timestamp": row.get("timestamp", ""),
-                        "question": row.get("question", ""),
-                        "answer": row.get("answer", "")
-                    })
-            st.session_state.user_chats = user_chats
-        except Exception as e:
-            st.warning(f"⚠️ Failed to load chats: {e}")
+        if st.session_state.user_chats:
+            topics = list(st.session_state.user_chats.keys())
 
-    if st.session_state.user_chats:
-        topics = list(st.session_state.user_chats.keys())
+            def _set_topic():
+                st.session_state.current_topic = st.session_state.selected_old_topic
+                st.session_state.ai_history = st.session_state.user_chats.get(
+                    st.session_state.current_topic, []
+                )
+                st.session_state.ai_mode = "old"
+                st.session_state.page = "AI Assistant"
+                st.rerun()
 
-        def set_old_topic():
-            st.session_state.current_topic = st.session_state.selected_old_topic_main
-            st.session_state.ai_history = st.session_state.user_chats.get(
-                st.session_state.current_topic, []
+            st.selectbox(
+                "📚 Select a saved chat:",
+                topics[::-1],
+                key="selected_old_topic",
+                on_change=_set_topic
             )
-            st.session_state.ai_mode = "old"
-            st.session_state.page = "AI Assistant"
-            st.rerun()
-
-        st.selectbox(
-            "📚 Select a saved chat:",
-            topics[::-1],
-            key="selected_old_topic_main",
-            on_change=set_old_topic
-        )
 
 # ------------------- OPTIONAL: Agri News -------------------
 st.sidebar.markdown("---")
