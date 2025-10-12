@@ -1,9 +1,9 @@
-#login page
 import streamlit as st
 import hashlib
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import streamlit.components.v1 as components
 
 # --------------------------------------------------------
 # 🔑 GOOGLE SHEET SETUP
@@ -15,7 +15,6 @@ SCOPE = [
 
 @st.cache_resource(show_spinner=False)
 def connect_google_sheet():
-    """Connect to Google Sheet using credentials from st.secrets."""
     if "google" not in st.secrets or "creds" not in st.secrets["google"]:
         st.warning("⚠️ Google credentials missing in secrets.")
         return None
@@ -29,16 +28,13 @@ def connect_google_sheet():
         st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
         return None
 
-
 # --------------------------------------------------------
 # 🔐 AUTH FUNCTIONS
 # --------------------------------------------------------
 def hash_password(password):
-    """Securely hash a password using SHA256."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def get_all_users(sheet):
-    """Get all users from the sheet."""
     if not sheet:
         return []
     try:
@@ -47,7 +43,6 @@ def get_all_users(sheet):
         return []
 
 def save_user(sheet, user):
-    """Add or update user details in Google Sheet."""
     if not sheet:
         return False
     users = get_all_users(sheet)
@@ -63,7 +58,7 @@ def save_user(sheet, user):
     ]
     try:
         if user["username"] in usernames:
-            idx = usernames.index(user["username"]) + 2  # Skip header row
+            idx = usernames.index(user["username"]) + 2  # Skip header
             sheet.update(f"A{idx}:G{idx}", [row])
         else:
             sheet.append_row(row)
@@ -73,22 +68,30 @@ def save_user(sheet, user):
         return False
 
 def verify_user(sheet, username, password):
-    """Validate login credentials."""
     hashed = hash_password(password)
     users = get_all_users(sheet)
     return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
 
-
 # --------------------------------------------------------
-# 🧑 LOGIN PAGE APP FUNCTION
+# 🧑 LOGIN PAGE
 # --------------------------------------------------------
 def app():
-    """Login and Registration UI."""
     sheet = connect_google_sheet()
-
-    # Initialize session variables safely
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
+
+    # --- Load stored user from browser localStorage ---
+    components.html("""
+        <script>
+        const storedUser = localStorage.getItem("logged_in_user");
+        if (storedUser) {
+            window.parent.postMessage({type: "auto_login", user: storedUser}, "*");
+        }
+        </script>
+    """, height=0)
+
+    # --- Listen for messages (auto-login trigger) ---
+    msg = st.experimental_get_query_params().get("auto_login_trigger", [None])[0]
 
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
@@ -108,8 +111,15 @@ def app():
                         st.session_state.logged_in = True
                         st.session_state.user = user
                         st.session_state.page = "Profile"
+
+                        # Store login in localStorage
+                        components.html(f"""
+                            <script>
+                            localStorage.setItem("logged_in_user", "{username}");
+                            </script>
+                        """, height=0)
+
                         st.success(f"✅ Welcome {user['username']}! Redirecting to your profile...")
-                        st.session_state.page = "Profile"
                         st.rerun()
                     else:
                         st.error("❌ Invalid username or password.")
@@ -140,6 +150,13 @@ def app():
                             st.success("✅ Registration successful! You can now log in.")
 
     else:
-        # If already logged in → move to profile
         st.session_state.page = "Profile"
+        st.rerun()
+
+    # --- Add Logout Button (optional) ---
+    if st.session_state.logged_in and st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.user = None
+        components.html("""<script>localStorage.removeItem("logged_in_user");</script>""", height=0)
+        st.success("👋 Logged out successfully.")
         st.rerun()
