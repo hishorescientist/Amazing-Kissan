@@ -168,10 +168,10 @@ def app():
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")
 
     # Session defaults
-    st.session_state.setdefault("ai_mode", None)
     st.session_state.setdefault("current_topic", None)
     st.session_state.setdefault("ai_history", [])
     st.session_state.setdefault("user_chats", {})
+    st.session_state.setdefault("guest_chats", {})
 
     username = st.session_state.user["username"] if st.session_state.get("logged_in") else "Guest"
 
@@ -179,15 +179,13 @@ def app():
     if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED and not st.session_state.user_chats:
         st.session_state.user_chats = load_user_chats(username)
 
-    # Set current topic if first message
-    if st.session_state.current_topic is None and st.session_state.user_chats:
-        # Default to latest topic
-        st.session_state.current_topic = list(st.session_state.user_chats.keys())[-1]
-        st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
-
-    # Display current topic
+    # Determine what to show on top
     if st.session_state.current_topic:
-        st.subheader(f"📘 Topic: {st.session_state.current_topic}")
+        display_topic = st.session_state.current_topic
+    else:
+        display_topic = "New Chat"
+
+    st.subheader(f"📘 Topic: {display_topic}")
 
     # Display chat history
     if st.session_state.ai_history:
@@ -201,17 +199,11 @@ def app():
     # Chat input
     user_input = st.chat_input("💬 Type your question here (any language)...")
     if user_input:
-        if st.session_state.current_topic is None:
-            topic = generate_topic(user_input, "First message", list(st.session_state.user_chats.keys()))
-            st.session_state.current_topic = topic
-        else:
-            topic = st.session_state.current_topic
-
-        # Include previous guest chats if user is guest
+        # Combine previous guest messages if needed
         if not st.session_state.get("logged_in"):
             guest_memory = []
-            for topic_msgs in st.session_state.get("guest_chats", {}).values():
-                guest_memory.extend(topic_msgs)
+            for msgs in st.session_state.get("guest_chats", {}).values():
+                guest_memory.extend(msgs)
             full_history = guest_memory + st.session_state.ai_history
         else:
             full_history = st.session_state.ai_history
@@ -225,6 +217,40 @@ def app():
             "answer": answer
         }
 
+        # First message in new chat
+        if st.session_state.current_topic is None:
+            st.session_state.current_topic = "New Chat"
+            st.session_state.ai_history.append(chat_entry)
+
+            # Display first user and AI message immediately
+            with st.chat_message("user"):
+                st.markdown(user_input)
+            with st.chat_message("assistant"):
+                st.markdown(answer)
+                st.markdown(f"*Model used: {model}*")
+
+            # Now generate real topic from first Q&A
+            real_topic = generate_topic(user_input, answer, list(st.session_state.user_chats.keys()))
+            st.session_state.current_topic = real_topic
+
+            # Move first message under the new topic
+            if real_topic not in st.session_state.user_chats:
+                st.session_state.user_chats[real_topic] = []
+            st.session_state.user_chats[real_topic].append(chat_entry)
+            st.session_state.ai_history = st.session_state.user_chats[real_topic]
+
+            # Save if logged in
+            if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+                save_chat(username, real_topic, user_input, answer)
+            else:
+                st.session_state["guest_chats"].setdefault(real_topic, []).append(chat_entry)
+
+            # Refresh display with real topic
+            st.experimental_rerun()
+            return
+
+        # Subsequent messages
+        topic = st.session_state.current_topic
         if topic not in st.session_state.user_chats:
             st.session_state.user_chats[topic] = []
         st.session_state.user_chats[topic].append(chat_entry)
@@ -243,12 +269,8 @@ def app():
             st.markdown(answer)
             st.markdown(f"*Model used: {model}*")
 
-        # Save chat only if user is logged in
+        # Save chat
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
             save_chat(username, st.session_state.current_topic, user_input, answer)
         else:
-            # Guest chat: keep in session
-            st.session_state["guest_chats"] = st.session_state.get("guest_chats", {})
-            if topic not in st.session_state["guest_chats"]:
-                st.session_state["guest_chats"][topic] = []
-            st.session_state["guest_chats"][topic].append(chat_entry)
+            st.session_state["guest_chats"].setdefault(topic, []).append(chat_entry)
