@@ -5,9 +5,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-# --------------------------------------------------------
-# 🔑 GOOGLE SHEET SETUP
-# --------------------------------------------------------
+# ------------------- GOOGLE SHEET -------------------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
@@ -28,10 +26,7 @@ def connect_google_sheet():
         st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
         return None
 
-
-# --------------------------------------------------------
-# 🔐 AUTH FUNCTIONS
-# --------------------------------------------------------
+# ------------------- AUTH -------------------
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -59,7 +54,7 @@ def save_user(sheet, user):
     ]
     try:
         if user["username"] in usernames:
-            idx = usernames.index(user["username"]) + 2  # Skip header
+            idx = usernames.index(user["username"]) + 2
             sheet.update(f"A{idx}:G{idx}", [row])
         else:
             sheet.append_row(row)
@@ -73,42 +68,52 @@ def verify_user(sheet, username, password):
     users = get_all_users(sheet)
     return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
 
-
-# --------------------------------------------------------
-# 🧑 LOGIN PAGE
-# --------------------------------------------------------
+# ------------------- LOGIN PAGE -------------------
 def app():
     sheet = connect_google_sheet()
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
+    st.session_state.setdefault("local_auto_checked", False)
 
-    # --- STEP 1: Check for existing localStorage user ---
-    stored_username = st.query_params.get("user", [None])[0] if hasattr(st, "query_params") else None
-    if not stored_username:
+    # -------- STEP 1: Auto-login from localStorage (only once) --------
+    if not st.session_state.logged_in and not st.session_state.local_auto_checked:
         components.html("""
-            <script>
-            const user = localStorage.getItem("logged_in_user");
-            if (user) {
-                // Add query parameter and reload Streamlit app
-                const url = new URL(window.location);
-                url.searchParams.set("user", user);
-                window.location.href = url.toString();
-            }
-            </script>
+        <script>
+        const user = localStorage.getItem("logged_in_user");
+        if (user) {
+            const url = new URL(window.location);
+            url.searchParams.set("user", user);
+            window.location.replace(url.toString());
+        }
+        </script>
         """, height=0)
+        st.session_state.local_auto_checked = True
+        st.stop()  # stop further execution until page reloads
 
-    # --- STEP 2: Auto login if username found in query params ---
-    if stored_username and not st.session_state.logged_in:
+    # -------- STEP 2: Check query param after reload --------
+    query_user = st.query_params.get("user")
+    if isinstance(query_user, list):
+        query_user = query_user[0]
+
+    if query_user and not st.session_state.logged_in:
         users = get_all_users(sheet)
-        user = next((u for u in users if u["username"] == stored_username), None)
+        user = next((u for u in users if str(u.get("username")) == str(query_user)), None)
         if user:
             st.session_state.logged_in = True
             st.session_state.user = user
             st.session_state.page = "Profile"
-            st.success(f"✅ Welcome back {user['username']}!")
+            # Clear the query param
+            components.html("""
+            <script>
+            const url = new URL(window.location);
+            url.searchParams.delete('user');
+            window.history.replaceState({}, document.title, url.toString());
+            </script>
+            """, height=0)
+            st.success(f"✅ Welcome back {user.get('username')}!")
             st.rerun()
 
-    # --- STEP 3: Login/Register ---
+    # -------- STEP 3: Login/Register UI --------
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
         login_tab, register_tab = st.tabs(["Login", "Register"])
@@ -125,12 +130,13 @@ def app():
                         st.session_state.logged_in = True
                         st.session_state.user = user
                         st.session_state.page = "Profile"
+                        # Save localStorage
                         components.html(f"""
-                            <script>
-                            localStorage.setItem("logged_in_user", "{username}");
-                            </script>
+                        <script>
+                        localStorage.setItem("logged_in_user", "{username}");
+                        </script>
                         """, height=0)
-                        st.success(f"✅ Welcome {user['username']}! Redirecting...")
+                        st.success(f"✅ Welcome {username}! Redirecting...")
                         st.rerun()
                     else:
                         st.error("❌ Invalid username or password.")
@@ -158,7 +164,7 @@ def app():
                         if save_user(sheet, user_dict):
                             st.success("✅ Registration successful! You can now log in.")
 
-    # --- STEP 4: Logout clears localStorage ---
+    # -------- STEP 4: Logout --------
     if st.session_state.logged_in and st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user = None
