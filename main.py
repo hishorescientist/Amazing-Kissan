@@ -132,7 +132,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
-                st.rerun()
+                
 
             st.selectbox(
                 "📚 Select a saved chat:",
