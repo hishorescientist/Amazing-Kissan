@@ -1,28 +1,34 @@
 # main.py
 import streamlit as st
+import json
+import gspread
 import requests
+from oauth2client.service_account import ServiceAccountCredentials
 
 from login import app as login_page
 from profile import app as profile_page
+from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-from ai_assistant import app as ai_page
-from utils import connect_google_sheet
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
-# Hide Streamlit menu and change sidebar icon
 hide_menu = """
 <style>
+/* Customize sidebar toggle icon */
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
-    content: "🛠️";
-    font-size: 20px;
-    color: #FF5733;
+    content: "🛠️";  
+    font-size: 20px; 
+    color: #FF5733;  
 }
-#MainMenu {visibility:hidden;}
-[data-testid="stToolbarActions"] {visibility:hidden;}
+
+#MainMenu {
+     visibility:hidden;
+}
+[data-testid="stToolbarActions"] {
+     visibility:hidden;
+}
 </style>
 """
 st.markdown(hide_menu, unsafe_allow_html=True)
@@ -36,44 +42,100 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False
+    "redirect_done": False  # prevents rerun loop after login
 }
 for k, v in default_state.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    st.session_state.setdefault(k, v)
 
-# ------------------- SIDEBAR NAVIGATION -------------------
+# ------------------- GOOGLE SHEET SETUP -------------------
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def connect_google_sheet():
+    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
+        return None
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("ai data")
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        return None
+
+sheet = connect_google_sheet()
+
+# ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home", "About", "AI Assistant", "Contact"]
-if not st.session_state.logged_in:
-    main_menu.append("Login")
-else:
-    main_menu.append("Profile")
-
+main_menu = ["Home", "About", "AI Assistant", "Contact", "Login"]
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.rerun()
+        st.experimental_rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
-    if st.button("🆕 New Chat", key="ai_new"):
+
+    # 🆕 New Chat
+    if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.ai_mode = "new"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.rerun()
+        st.experimental_rerun()
 
-    if st.button("👤 Guest Chat", key="ai_guest"):
+    # 👤 Guest Chat
+    if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.rerun()
+        st.experimental_rerun()
 
-# ------------------- Agri News Sidebar -------------------
+    # 📂 Load Old Chats (Logged-in Users)
+    if st.session_state.logged_in and st.session_state.user:
+        if not st.session_state.user_chats and sheet:
+            try:
+                rows = sheet.get_all_records()
+                username = st.session_state.user.get("username", "")
+                user_chats = {}
+                for row in rows:
+                    if row.get("username") == username:
+                        topic = row.get("topic", "Untitled")
+                        user_chats.setdefault(topic, []).append({
+                            "timestamp": row.get("timestamp", ""),
+                            "question": row.get("question", ""),
+                            "answer": row.get("answer", "")
+                        })
+                st.session_state.user_chats = user_chats
+            except Exception as e:
+                st.warning(f"⚠️ Failed to load chats: {e}")
+
+        if st.session_state.user_chats:
+            topics = list(st.session_state.user_chats.keys())
+
+            def _set_topic():
+                st.session_state.current_topic = st.session_state.selected_old_topic
+                st.session_state.ai_history = st.session_state.user_chats.get(
+                    st.session_state.current_topic, []
+                )
+                st.session_state.ai_mode = "old"
+                st.session_state.page = "AI Assistant"
+                st.experimental_rerun()
+
+            st.selectbox(
+                "📚 Select a saved chat:",
+                topics[::-1],
+                key="selected_old_topic",
+                on_change=_set_topic
+            )
+
+# ------------------- AGRI NEWS SIDEBAR -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
 query = st.sidebar.text_input("Keyword", value="agriculture")
@@ -96,8 +158,13 @@ for n in get_agri_news(query):
     st.sidebar.markdown("---")
 
 # ------------------- PAGE ROUTING -------------------
-page = st.session_state.page
+# Auto-redirect logged-in users from Login → Profile
+if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
+    st.session_state.page = "Profile"
+    st.session_state.redirect_done = True
+    st.experimental_rerun()
 
+page = st.session_state.page
 if page == "Home":
     home_page()
 elif page == "About":
