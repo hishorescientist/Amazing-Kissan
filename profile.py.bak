@@ -1,6 +1,12 @@
 import streamlit as st
 from login import connect_google_sheet, save_user
 
+def logout():
+    for key in ["logged_in", "user", "current_topic", "ai_history", "user_chats", "guest_chats"]:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.info("You have been logged out.")
+
 # --------------------------------------------------------
 # 👤 PROFILE PAGE
 # --------------------------------------------------------
@@ -53,8 +59,11 @@ def app():
     # ----------------------------------------------------
     st.markdown("---")
     if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user = None
+       # Clear all session state related to user
+        for key in ["logged_in", "user", "current_topic", "ai_history", "user_chats", "guest_chats"]:
+            if key in st.session_state:
+                del st.session_state[key]
+    
+    # Redirect to login page
         st.session_state.page = "Login"
         st.success("✅ Logged out successfully.")
-        st.rerun()
