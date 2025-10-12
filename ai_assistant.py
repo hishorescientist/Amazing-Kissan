@@ -170,40 +170,63 @@ def ask_ai(question, history):
 
 # ------------------- STREAMLIT APP -------------------
 def app():
+# --- Keep sidebar and assistant selectboxes in sync ---
+    if "selected_old_topic" in st.session_state:
+        st.session_state.setdefault("ai_selected_old_topic", st.session_state.selected_old_topic)
+    if "ai_selected_old_topic" in st.session_state:
+        st.session_state.setdefault("selected_old_topic", st.session_state.ai_selected_old_topic)
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")
 
-    # --- Session defaults ---
-    for key in ["ai_mode", "current_topic", "ai_history", "user_chats", "guest_chats"]:
+    # Session defaults
+    for key in ["ai_mode", "current_topic", "ai_history", "user_chats"]:
         if key not in st.session_state:
-            st.session_state[key] = [] if key == "ai_history" else {} if key in ["user_chats", "guest_chats"] else None
+            st.session_state[key] = None if key=="current_topic" else {} if key=="user_chats" else []
 
     username = st.session_state.user["username"] if st.session_state.get("logged_in") else "Guest"
 
-    # --- Load old chats for logged-in users ---
+    # Load old chats once
     if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED and not st.session_state.user_chats:
         st.session_state.user_chats = load_user_chats(username)
 
-    # --- Display current topic name ---
-    topic_name = st.session_state.current_topic or "🆕 New Chat"
-    st.subheader(f"💬 Topic: {topic_name}")
+    # Old chat selection
+    if st.session_state.get("logged_in") and st.session_state.user_chats:
+        topics = list(st.session_state.user_chats.keys())
 
-    # --- Display chat history ---
-    history = st.session_state.ai_history
-    if history:
-        for msg in history:
-            with st.chat_message("user" if msg.get("question") else "assistant"):
-                st.markdown(msg.get("question") or msg.get("answer"))
+        def _set_topic():
+            st.session_state.selected_old_topic = st.session_state.ai_selected_old_topic
+            st.session_state.current_topic = st.session_state.ai_selected_old_topic
+            st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
+
+        st.selectbox(
+            "📚 Select a saved chat:",
+            topics[::-1],
+            key="ai_selected_old_topic",
+            on_change=_set_topic
+        )
+
+    # Display current topic
+    if st.session_state.current_topic:
+        st.subheader(f"📘 Topic: {st.session_state.current_topic}")
+
+    # Display chat history
+    if st.session_state.ai_history:
+        for msg in st.session_state.ai_history:
+            st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
+            st.markdown(f"**🤖 AI:** {msg['answer']}")
+            st.markdown("---")
     else:
         st.info("💬 Start a new conversation below!")
 
-    # --- Chat input ---
+    # Chat input
     user_input = st.chat_input("💬 Type your question here (any language)...")
     if user_input:
-        # --- Set topic if new chat ---
         if st.session_state.current_topic is None:
-            st.session_state.current_topic = f"Chat - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            topic = generate_topic(user_input, "First message", list(st.session_state.user_chats.keys()))
+            st.session_state.current_topic = topic
+        else:
+            topic = st.session_state.current_topic
 
-        # --- Include previous guest chats if user is guest ---
+        # Include previous guest chats if user is guest
         if not st.session_state.get("logged_in"):
             guest_memory = []
             for topic_msgs in st.session_state.get("guest_chats", {}).values():
@@ -212,8 +235,7 @@ def app():
         else:
             full_history = st.session_state.ai_history
 
-        # --- Get AI response ---
-        answer, _ = ask_ai(user_input, full_history)
+        answer, model = ask_ai(user_input, full_history)
 
         chat_entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -221,24 +243,31 @@ def app():
             "answer": answer
         }
 
-        # --- Append chat to proper storage ---
-        if st.session_state.get("logged_in"):
-            topic = st.session_state.current_topic
-            if topic not in st.session_state.user_chats:
-                st.session_state.user_chats[topic] = []
-            st.session_state.user_chats[topic].append(chat_entry)
-            st.session_state.ai_history.append(chat_entry)
+        if topic not in st.session_state.user_chats:
+            st.session_state.user_chats[topic] = []
+        st.session_state.user_chats[topic].append(chat_entry)
+        st.session_state.ai_history.append(chat_entry)
 
-            # Save to Google Sheet
-            if GOOGLE_SHEET_ENABLED:
-                save_chat(username, st.session_state.current_topic, user_input, answer)
+        # Optional: update topic dynamically after 3 messages
+        if len(st.session_state.ai_history) >= 3:
+            new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
+            if new_topic:
+                st.session_state.current_topic = new_topic
+
+        # Display messages
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        with st.chat_message("assistant"):
+            st.markdown(answer)
+
+        # Save chat only if user is logged in
+        if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+            save_chat(username, st.session_state.current_topic, user_input, answer)
         else:
-            # Guest chat: store in session only
+            # Guest chat: do not save permanently, only keep in session
             st.session_state["guest_chats"] = st.session_state.get("guest_chats", {})
             topic = st.session_state.current_topic
             if topic not in st.session_state["guest_chats"]:
                 st.session_state["guest_chats"][topic] = []
             st.session_state["guest_chats"][topic].append(chat_entry)
-            st.session_state.ai_history.append(chat_entry)
-
-        st.rerun()
+        
