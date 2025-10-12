@@ -75,7 +75,7 @@ for item in main_menu:
     if st.sidebar.button(item, use_container_width=True):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
@@ -87,7 +87,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
     # 👤 Guest Chat
     if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
@@ -95,7 +95,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-        st.experimental_rerun()
+        st.rerun()
 
     # 📂 Load Old Chats (Logged-in Users)
     if st.session_state.logged_in and st.session_state.user:
@@ -126,7 +126,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
-                st.experimental_rerun()
+                st.rerun()
 
             st.selectbox(
                 "📚 Select a saved chat:",
@@ -162,7 +162,7 @@ for n in get_agri_news(query):
 if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
     st.session_state.page = "Profile"
     st.session_state.redirect_done = True
-    st.experimental_rerun()
+    st.rerun()
 
 page = st.session_state.page
 if page == "Home":

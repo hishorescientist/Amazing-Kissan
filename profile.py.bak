@@ -10,7 +10,7 @@ def app():
     if not st.session_state.get("logged_in") or not st.session_state.get("user"):
         st.warning("⚠️ Please log in first.")
         st.session_state.page = "Login"
-        st.experimental_rerun()
+        st.rerun()
 
     user = st.session_state.user
     sheet = connect_google_sheet()
@@ -49,4 +49,4 @@ def app():
         import streamlit.components.v1 as components
         components.html("""<script>localStorage.removeItem("login_user");</script>""", height=0)
         st.success("👋 Logged out successfully.")
-        st.experimental_rerun()
+        st.rerun()
