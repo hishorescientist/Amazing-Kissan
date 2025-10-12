@@ -235,7 +235,7 @@ def app():
         else:
             full_history = st.session_state.ai_history
 
-answer, model = ask_ai(user_input, full_history)
+        answer, model = ask_ai(user_input, full_history)
 
         chat_entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
