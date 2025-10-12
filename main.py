@@ -3,6 +3,7 @@ import streamlit as st
 import json
 import gspread
 import requests
+import os
 from oauth2client.service_account import ServiceAccountCredentials
 
 from login import app as login_page
@@ -11,29 +12,23 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-# Add this function and call it at the beginning of your script
+
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
+
 hide_menu = """
 <style>
-
-/* Select the sidebar hamburger icon */
-    [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
-        content: "🛠️";  /* Replace with any emoji or symbol you like */
-        font-size: 20px; /* Adjust size */
-        color: #FF5733;  /* Change color */
-    }
-    
-#MainMenu {
-     visibility:hidden;
+[data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
+    content: "🛠️";
+    font-size: 20px;
+    color: #FF5733;
 }
-[data-testid="stToolbarActions"] {
-     visibility:hidden;
-}
+#MainMenu {visibility:hidden;}
+[data-testid="stToolbarActions"] {visibility:hidden;}
 </style>
 """
-st.markdown(hide_menu,unsafe_allow_html=True)
-     
+st.markdown(hide_menu, unsafe_allow_html=True)
+
 # ------------------- SESSION STATE -------------------
 default_state = {
     "page": "Home",
@@ -43,11 +38,45 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False  # prevents rerun loop after login
+    "redirect_done": False
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# ------------------- AUTO LOGIN (using local log file) -------------------
+LOG_FILE = "user_log.json"
+
+def save_log(user_data):
+    """Save login info to local file for auto-login"""
+    try:
+        with open(LOG_FILE, "w") as f:
+            json.dump(user_data, f)
+    except Exception as e:
+        st.warning(f"⚠️ Could not save log: {e}")
+
+def load_log():
+    """Load saved login info"""
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+def clear_log():
+    """Delete saved login info"""
+    if os.path.exists(LOG_FILE):
+        os.remove(LOG_FILE)
+
+# Attempt auto-login on app load
+if not st.session_state.logged_in:
+    saved_user = load_log()
+    if saved_user:
+        st.session_state.logged_in = True
+        st.session_state.user = saved_user
+        st.session_state.page = "Profile"
 
 # ------------------- GOOGLE SHEET SETUP -------------------
 SCOPE = [
@@ -56,8 +85,6 @@ SCOPE = [
 ]
 
 def connect_google_sheet():
-    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
-        return None
     try:
         creds_json = st.secrets["google"]["creds"]
         creds_dict = json.loads(creds_json)
@@ -72,7 +99,13 @@ sheet = connect_google_sheet()
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home", "About", "AI Assistant", "Contact", "Login"]
+main_menu = ["Home", "About", "AI Assistant", "Contact"]
+
+if not st.session_state.logged_in:
+    main_menu.append("Login")
+else:
+    main_menu.append("Profile")
+
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True):
         st.session_state.page = item
@@ -82,8 +115,6 @@ for item in main_menu:
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
-
-    # 🆕 New Chat
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.ai_mode = "new"
         st.session_state.current_topic = None
@@ -91,7 +122,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
-    # 👤 Guest Chat
     if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
@@ -99,9 +129,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
-    # 📂 Load Old Chats (Logged-in Users)
     if st.session_state.logged_in and st.session_state.user:
-        # Load user chats if not already loaded
         if not st.session_state.user_chats and sheet:
             try:
                 rows = sheet.get_all_records()
@@ -121,18 +149,16 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             except Exception as e:
                 st.warning(f"⚠️ Failed to load chats: {e}")
 
-        # Display selectbox only if chats exist
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
+
             def _set_topic():
-                
                 st.session_state.current_topic = st.session_state.selected_old_topic
                 st.session_state.ai_history = st.session_state.user_chats.get(
                     st.session_state.current_topic, []
                 )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
-                
 
             st.selectbox(
                 "📚 Select a saved chat:",
@@ -148,7 +174,6 @@ st.sidebar.subheader("📰 Agri News")
 query = st.sidebar.text_input("Keyword", value="agriculture")
 
 @st.cache_data(ttl=600)
-
 def get_agri_news(q):
     try:
         api_key = st.secrets.get("NEWS_API_KEY", "")
@@ -165,15 +190,14 @@ for n in get_agri_news(query):
     st.sidebar.caption(n["source"]["name"])
     st.sidebar.markdown("---")
 
-
 # ------------------- PAGE ROUTING -------------------
-# Direct logged-in users from login to profile
 if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
     st.session_state.page = "Profile"
     st.session_state.redirect_done = True
     st.rerun()
 
 page = st.session_state.page
+
 if page == "Home":
     home_page()
 elif page == "About":
@@ -183,6 +207,12 @@ elif page == "AI Assistant":
 elif page == "Contact":
     contact_page()
 elif page == "Login":
-    login_page()
+    user = login_page()
+    if user:
+        st.session_state.logged_in = True
+        st.session_state.user = user
+        save_log(user)  # Save login info for next time
+        st.session_state.page = "Profile"
+        st.rerun()
 elif page == "Profile":
     profile_page()
