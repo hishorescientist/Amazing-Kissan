@@ -179,12 +179,8 @@ def app():
     if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED and not st.session_state.user_chats:
         st.session_state.user_chats = load_user_chats(username)
 
-    # Determine what to show on top
-    if st.session_state.current_topic:
-        display_topic = st.session_state.current_topic
-    else:
-        display_topic = "New Chat"
-
+    # Determine topic to display
+    display_topic = st.session_state.current_topic if st.session_state.current_topic else "New Chat"
     st.subheader(f"📘 Topic: {display_topic}")
 
     # Display chat history
@@ -199,7 +195,7 @@ def app():
     # Chat input
     user_input = st.chat_input("💬 Type your question here (any language)...")
     if user_input:
-        # Combine previous guest messages if needed
+        # Full history for AI
         if not st.session_state.get("logged_in"):
             guest_memory = []
             for msgs in st.session_state.get("guest_chats", {}).values():
@@ -217,60 +213,54 @@ def app():
             "answer": answer
         }
 
-        # First message in new chat
+        # First message in a new chat
         if st.session_state.current_topic is None:
+            # Show "New Chat" temporarily
             st.session_state.current_topic = "New Chat"
             st.session_state.ai_history.append(chat_entry)
 
-            # Display first user and AI message immediately
+            # Display first message
             with st.chat_message("user"):
                 st.markdown(user_input)
             with st.chat_message("assistant"):
                 st.markdown(answer)
                 st.markdown(f"*Model used: {model}*")
 
-            # Now generate real topic from first Q&A
+            # Generate real topic
             real_topic = generate_topic(user_input, answer, list(st.session_state.user_chats.keys()))
             st.session_state.current_topic = real_topic
 
-            # Move first message under the new topic
-            if real_topic not in st.session_state.user_chats:
-                st.session_state.user_chats[real_topic] = []
-            st.session_state.user_chats[real_topic].append(chat_entry)
+            # Move first message under the real topic
+            st.session_state.user_chats.setdefault(real_topic, []).append(chat_entry)
             st.session_state.ai_history = st.session_state.user_chats[real_topic]
 
-            # Save if logged in
+            # Save chat
             if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
                 save_chat(username, real_topic, user_input, answer)
             else:
                 st.session_state["guest_chats"].setdefault(real_topic, []).append(chat_entry)
 
-            # Refresh display with real topic
-            st.rerun()
-            return
-
-        # Subsequent messages
-        topic = st.session_state.current_topic
-        if topic not in st.session_state.user_chats:
-            st.session_state.user_chats[topic] = []
-        st.session_state.user_chats[topic].append(chat_entry)
-        st.session_state.ai_history.append(chat_entry)
-
-        # Optional: update topic dynamically after 3 messages
-        if len(st.session_state.ai_history) >= 3:
-            new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
-            if new_topic and new_topic != st.session_state.current_topic:
-                st.session_state.current_topic = new_topic
-
-        # Display messages
-        with st.chat_message("user"):
-            st.markdown(user_input)
-        with st.chat_message("assistant"):
-            st.markdown(answer)
-            st.markdown(f"*Model used: {model}*")
-
-        # Save chat
-        if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
-            save_chat(username, st.session_state.current_topic, user_input, answer)
         else:
-            st.session_state["guest_chats"].setdefault(topic, []).append(chat_entry)
+            # Subsequent messages
+            topic = st.session_state.current_topic
+            st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
+            st.session_state.ai_history.append(chat_entry)
+
+            # Optional: dynamic topic update after 3 messages
+            if len(st.session_state.ai_history) >= 3:
+                new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
+                if new_topic and new_topic != st.session_state.current_topic:
+                    st.session_state.current_topic = new_topic
+
+            # Display messages
+            with st.chat_message("user"):
+                st.markdown(user_input)
+            with st.chat_message("assistant"):
+                st.markdown(answer)
+                st.markdown(f"*Model used: {model}*")
+
+            # Save chat
+            if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+                save_chat(username, st.session_state.current_topic, user_input, answer)
+            else:
+                st.session_state["guest_chats"].setdefault(topic, []).append(chat_entry)

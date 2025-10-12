@@ -142,4 +142,4 @@ def app():
     else:
         # If already logged in → move to profile
         st.session_state.page = "Profile"
-        st.rerun()
+        

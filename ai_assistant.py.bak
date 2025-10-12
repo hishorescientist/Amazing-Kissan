@@ -246,7 +246,7 @@ def app():
                 st.session_state["guest_chats"].setdefault(real_topic, []).append(chat_entry)
 
             # Refresh display with real topic
-            st.experimental_rerun()
+            st.rerun()
             return
 
         # Subsequent messages
