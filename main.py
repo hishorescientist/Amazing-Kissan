@@ -1,6 +1,6 @@
 # main.py
 import streamlit as st
-from utils import connect_google_sheet, init_ai_sheet
+from utils import connect_google_sheet
 from login import app as login_page
 from profile import app as profile_page
 from ai_assistant import app as ai_page
