@@ -55,34 +55,31 @@ def save_user(sheet, user):
 def app():
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
+    st.session_state.setdefault("token_checked", False)
     sheet = connect_google_sheet()
 
-    # --- STEP 1: Detect localStorage token ---
-    token_param = st.query_params().get("login_token", [None])[0]
-
-    if not st.session_state.logged_in and not token_param:
-        # Ask JS to read localStorage and reload with query param
+    # --- STEP 1: Check localStorage token only once ---
+    if not st.session_state.token_checked:
         components.html("""
         <script>
         const token = localStorage.getItem("login_token");
         if(token){
-            const url = new URL(window.location);
-            url.searchParams.set("login_token", token);
-            window.location.replace(url.toString());
+            window.parent.postMessage({login_token: token}, "*");
         }
         </script>
         """, height=0)
-        return  # stop Streamlit render until JS triggers reload
+        st.session_state.token_checked = True
 
-    # --- STEP 2: Auto-login using query param ---
-    if token_param and not st.session_state.logged_in:
+    # --- STEP 2: Receive token via Streamlit message ---
+    token = st.experimental_get_query_params().get("login_token", [None])[0] if st.experimental_get_query_params() else None
+    if token and not st.session_state.logged_in:
         users = get_all_users(sheet)
-        user = next((u for u in users if u["username"]==token_param), None)
+        user = next((u for u in users if u["username"]==token), None)
         if user:
             st.session_state.logged_in = True
             st.session_state.user = user
             st.success(f"✅ Welcome back {user['username']}!")
-            # Remove param to prevent reload loop
+            # remove token param to prevent reload loops
             components.html("""
             <script>
             const url = new URL(window.location);
@@ -110,7 +107,7 @@ def app():
                         # save token
                         components.html(f"""<script>localStorage.setItem("login_token", "{username}");</script>""", height=0)
                         st.success(f"✅ Logged in as {username}")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.error("❌ Invalid username/password")
 
@@ -135,4 +132,4 @@ def app():
         st.session_state.user = None
         components.html("""<script>localStorage.removeItem("login_token");</script>""", height=0)
         st.success("👋 Logged out successfully")
-        st.rerun()
+        st.experimental_rerun()
