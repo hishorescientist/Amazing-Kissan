@@ -226,7 +226,16 @@ def app():
         else:
             topic = st.session_state.current_topic
 
-        answer, model = ask_ai(user_input, st.session_state.ai_history)
+        # Include previous guest chats if user is guest
+        if not st.session_state.get("logged_in"):
+            guest_memory = []
+            for topic_msgs in st.session_state.get("guest_chats", {}).values():
+                guest_memory.extend(topic_msgs)
+            full_history = guest_memory + st.session_state.ai_history
+        else:
+            full_history = st.session_state.ai_history
+
+        answer, model = ask_ai(user_input, full_history)
 
         chat_entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -251,6 +260,14 @@ def app():
         with st.chat_message("assistant"):
             st.markdown(answer)
 
-        # Save to Google Sheet if logged in
+        # Save chat only if user is logged in
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
             save_chat(username, st.session_state.current_topic, user_input, answer)
+        else:
+            # Guest chat: do not save permanently, only keep in session
+            st.session_state["guest_chats"] = st.session_state.get("guest_chats", {})
+            topic = st.session_state.current_topic
+            if topic not in st.session_state["guest_chats"]:
+                st.session_state["guest_chats"][topic] = []
+            st.session_state["guest_chats"][topic].append(chat_entry)
+        
