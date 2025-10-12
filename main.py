@@ -5,7 +5,7 @@ import requests
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-from login import app as login_page, connect_google_sheet as connect_user_sheet_from_login
+from login import app as login_page, connect_google_sheet as connect_user_sheet_from_login, get_all_users
 from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
@@ -15,7 +15,6 @@ from contact import app as contact_page
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
-# Hide Streamlit default menu and customize sidebar icon
 hide_menu = """
 <style>
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
@@ -38,8 +37,8 @@ default_state = {
     "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False,  # prevents rerun loop after login
-    "local_checked": False   # for AppCreator24 auto-login
+    "redirect_done": False,
+    "checked_local": False
 }
 for k, v in default_state.items():
     if k not in st.session_state:
@@ -82,40 +81,42 @@ def connect_ai_sheet():
 ai_sheet = connect_ai_sheet()
 user_sheet = connect_user_sheet()
 
-# ------------------- AUTO-LOGIN (AppCreator24 localStorage) -------------------
-if not st.session_state.logged_in and not st.session_state.local_checked:
+# ------------------- AUTO-LOGIN (AppCreator24 safe) -------------------
+if not st.session_state.logged_in and not st.session_state.checked_local:
     components.html("""
         <script>
         const token = localStorage.getItem("login_token");
         if (token) {
-            window.name = token;
-            window.location.reload();
+            const url = new URL(window.location.href);
+            url.searchParams.set("auto_user", token);
+            window.location.replace(url.toString());
         }
         </script>
     """, height=0)
-    st.session_state.local_checked = True
-    st.stop()  # wait for reload
+    st.session_state.checked_local = True
+    st.stop()  # stop until reload
 
-# After reload, restore login if window.name contains username
-if not st.session_state.logged_in and user_sheet:
-    try:
-        username = st.experimental_get_query_params().get("user", [None])[0]
-    except Exception:
-        username = None
-    if not username:
-        try:
-            username = str(window.name)
-        except Exception:
-            username = None
-    if username:
-        users = user_sheet.get_all_records()
-        user = next((u for u in users if str(u["username"]) == str(username)), None)
-        if user:
-            st.session_state.logged_in = True
-            st.session_state.user = user
-            st.session_state.page = "Profile"
-            st.success(f"✅ Welcome back {user.get('username')}!")
-            st.rerun()
+# After reload, restore login from query param
+params = st.experimental_get_query_params()
+auto_user = params.get("auto_user", [None])[0]
+
+if auto_user and not st.session_state.logged_in and user_sheet:
+    users = get_all_users(user_sheet)
+    user = next((u for u in users if str(u.get("username")) == str(auto_user)), None)
+    if user:
+        st.session_state.logged_in = True
+        st.session_state.user = user
+        st.session_state.page = "Profile"
+        st.success(f"✅ Welcome back {user.get('username')}!")
+        # Remove query param
+        components.html("""
+            <script>
+            const url = new URL(window.location.href);
+            url.searchParams.delete("auto_user");
+            window.history.replaceState({}, document.title, url.toString());
+            </script>
+        """, height=0)
+        st.rerun()
 
 # ------------------- SIDEBAR NAVIGATION -------------------
 st.sidebar.title("🌿 Navigation")
@@ -173,7 +174,9 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             topics = list(st.session_state.user_chats.keys())
             def _set_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic
-                st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
+                st.session_state.ai_history = st.session_state.user_chats.get(
+                    st.session_state.current_topic, []
+                )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
 

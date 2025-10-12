@@ -15,12 +15,13 @@ from contact import app as contact_page
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
+# Hide Streamlit default menu and customize sidebar icon
 hide_menu = """
 <style>
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
-    color: #FF5733";
+    color: #FF5733;
 }
 #MainMenu {visibility:hidden;}
 [data-testid="stToolbarActions"] {visibility:hidden;}
@@ -38,17 +39,34 @@ default_state = {
     "current_topic": None,
     "user_chats": {},
     "redirect_done": False,  # prevents rerun loop after login
-    "local_auto_checked": False  # prevents repeated JS injection
+    "local_checked": False   # for AppCreator24 auto-login
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- GOOGLE SHEETS -------------------
+# ------------------- GOOGLE SHEET HELPERS -------------------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
+
+def connect_user_sheet():
+    try:
+        ws = connect_user_sheet_from_login()
+        if ws:
+            return ws
+    except Exception:
+        pass
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("Sheet1")
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to User sheet: {e}")
+        return None
 
 def connect_ai_sheet():
     try:
@@ -62,8 +80,44 @@ def connect_ai_sheet():
         return None
 
 ai_sheet = connect_ai_sheet()
+user_sheet = connect_user_sheet()
 
-# ------------------- SIDEBAR MENU -------------------
+# ------------------- AUTO-LOGIN (AppCreator24 localStorage) -------------------
+if not st.session_state.logged_in and not st.session_state.local_checked:
+    components.html("""
+        <script>
+        const token = localStorage.getItem("login_token");
+        if (token) {
+            window.name = token;
+            window.location.reload();
+        }
+        </script>
+    """, height=0)
+    st.session_state.local_checked = True
+    st.stop()  # wait for reload
+
+# After reload, restore login if window.name contains username
+if not st.session_state.logged_in and user_sheet:
+    try:
+        username = st.experimental_get_query_params().get("user", [None])[0]
+    except Exception:
+        username = None
+    if not username:
+        try:
+            username = str(window.name)
+        except Exception:
+            username = None
+    if username:
+        users = user_sheet.get_all_records()
+        user = next((u for u in users if str(u["username"]) == str(username)), None)
+        if user:
+            st.session_state.logged_in = True
+            st.session_state.user = user
+            st.session_state.page = "Profile"
+            st.success(f"✅ Welcome back {user.get('username')}!")
+            st.rerun()
+
+# ------------------- SIDEBAR NAVIGATION -------------------
 st.sidebar.title("🌿 Navigation")
 main_menu = ["Home", "About", "AI Assistant", "Contact"]
 if not st.session_state.logged_in:
@@ -94,6 +148,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
+    # Load old chats for logged-in users
     if st.session_state.logged_in and st.session_state.user:
         if not st.session_state.user_chats and ai_sheet:
             try:
@@ -118,11 +173,10 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             topics = list(st.session_state.user_chats.keys())
             def _set_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic
-                st.session_state.ai_history = st.session_state.user_chats.get(
-                    st.session_state.current_topic, []
-                )
+                st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
+
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
@@ -130,9 +184,10 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=_set_topic
             )
 
-# ------------------- Agri News Sidebar -------------------
+# ------------------- AGRI NEWS -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
+
 query = st.sidebar.text_input("Keyword", value="agriculture")
 
 @st.cache_data(ttl=600)
