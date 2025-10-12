@@ -89,7 +89,7 @@ def app():
         }
         </script>
     """, height=0)
-
+    
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
         login_tab, register_tab = st.tabs(["Login", "Register"])
