@@ -1,38 +1,21 @@
+# profile.py
 import streamlit as st
-import os
-import json
-from login import connect_google_sheet, save_user
-
-# --------------------------------------------------------
-# 👤 PROFILE PAGE
-# --------------------------------------------------------
-LOG_FILE = "user_log.json"  # Same name used in main.py
-
-def clear_log():
-    """Delete saved login info for security"""
-    if os.path.exists(LOG_FILE):
-        try:
-            os.remove(LOG_FILE)
-        except Exception as e:
-            st.warning(f"⚠️ Could not remove log file: {e}")
+from utils import connect_google_sheet, save_user
 
 def app():
-    """User Profile Page."""
+    """User Profile Page"""
     st.title("👤 User Profile")
 
-    # Ensure session and login state
-    if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    # Ensure user is logged in
+    if not st.session_state.get("logged_in") or not st.session_state.get("user"):
         st.warning("⚠️ Please log in first.")
         st.session_state.page = "Login"
-        st.rerun()
+        st.experimental_rerun()
 
-    # Load current user info
-    user = st.session_state.get("user", {})
+    user = st.session_state.user
     sheet = connect_google_sheet()
-
-    # ----------------------------------------------------
-    # ✏️ Editable Profile Fields
-    # ----------------------------------------------------
+    
+    # ---------------- Profile Form ----------------
     with st.form("profile_form", clear_on_submit=False):
         name = st.text_input("Full Name", user.get("name", ""))
         email = st.text_input("Email", user.get("email", ""))
@@ -42,9 +25,6 @@ def app():
 
         save_btn = st.form_submit_button("💾 Save Changes")
 
-    # ----------------------------------------------------
-    # 💾 Save Button Handler
-    # ----------------------------------------------------
     if save_btn:
         updated_user = {
             "username": user.get("username"),
@@ -55,25 +35,18 @@ def app():
             "address": address,
             "dob": str(dob)
         }
-
         if save_user(sheet, updated_user):
             st.session_state.user = updated_user
             st.success("✅ Profile updated successfully!")
 
-    # ----------------------------------------------------
-    # 🚪 Logout Button
-    # ----------------------------------------------------
+    # ---------------- Logout ----------------
     st.markdown("---")
     if st.button("🚪 Logout", use_container_width=True):
-        # Clear session state
-        for key in ["logged_in", "user", "current_topic", "ai_history", "user_chats", "guest_chats"]:
-            if key in st.session_state:
-                del st.session_state[key]
-
-        # Delete auto-login log file
-        clear_log()
-
-        # Redirect to login page
+        st.session_state.logged_in = False
+        st.session_state.user = None
         st.session_state.page = "Login"
-        st.success("✅ Logged out successfully.")
-        st.rerun()
+        # Remove token from localStorage
+        import streamlit.components.v1 as components
+        components.html("""<script>localStorage.removeItem("login_user");</script>""", height=0)
+        st.success("👋 Logged out successfully.")
+        st.experimental_rerun()

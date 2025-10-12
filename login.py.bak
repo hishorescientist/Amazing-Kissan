@@ -72,4 +72,4 @@ def app():
         st.session_state.user = None
         components.html('<script>localStorage.removeItem("login_token");</script>', height=0)
         st.success("✅ Logged out!")
-        st.experimental_rerun()
+        st.rerun()
