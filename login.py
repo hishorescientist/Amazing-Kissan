@@ -71,7 +71,7 @@ def app():
         st.session_state.token_checked = True
 
     # --- STEP 2: Receive token via Streamlit message ---
-    token = st.experimental_get_query_params().get("login_token", [None])[0] if st.experimental_get_query_params() else None
+    token = st.query_params().get("login_token", [None])[0] if st.query_params() else None
     if token and not st.session_state.logged_in:
         users = get_all_users(sheet)
         user = next((u for u in users if u["username"]==token), None)
@@ -107,7 +107,7 @@ def app():
                         # save token
                         components.html(f"""<script>localStorage.setItem("login_token", "{username}");</script>""", height=0)
                         st.success(f"✅ Logged in as {username}")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("❌ Invalid username/password")
 
@@ -132,4 +132,4 @@ def app():
         st.session_state.user = None
         components.html("""<script>localStorage.removeItem("login_token");</script>""", height=0)
         st.success("👋 Logged out successfully")
-        st.experimental_rerun()
+        st.rerun()
