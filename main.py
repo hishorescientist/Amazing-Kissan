@@ -125,6 +125,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
             def _set_topic():
+                st.session_state.ai_selected_old_topic = st.session_state.selected_old_topic
                 st.session_state.current_topic = st.session_state.selected_old_topic
                 st.session_state.ai_history = st.session_state.user_chats.get(
                     st.session_state.current_topic, []
