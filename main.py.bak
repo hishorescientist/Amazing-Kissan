@@ -1,7 +1,9 @@
 # main.py
 import streamlit as st
+import json
 import requests
-from utils import connect_google_sheet, init_ai_sheet, save_user, verify_user
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 from login import app as login_page
 from profile import app as profile_page
@@ -12,17 +14,21 @@ from contact import app as contact_page
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
-# Hide default Streamlit menu and toolbar, customize sidebar toggle
 hide_menu = """
 <style>
+/* Sidebar hamburger icon */
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
-    content: "🛠️";  
-    font-size: 20px; 
+    content: "🛠️";
+    font-size: 20px;
     color: #FF5733;
 }
-#MainMenu { visibility:hidden; }
-[data-testid="stToolbarActions"] { visibility:hidden; }
+
+#MainMenu {
+    visibility:hidden;
+}
+[data-testid="stToolbarActions"] {
+    visibility:hidden;
+}
 </style>
 """
 st.markdown(hide_menu, unsafe_allow_html=True)
@@ -43,8 +49,25 @@ for k, v in default_state.items():
         st.session_state[k] = v
 
 # ------------------- GOOGLE SHEET SETUP -------------------
-sheet = connect_google_sheet()          # For user login/signup
-ai_sheet = init_ai_sheet()              # For AI chat storage
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def connect_google_sheet():
+    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
+        return None
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("ai data")
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        return None
+
+sheet = connect_google_sheet()
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
@@ -58,7 +81,8 @@ for item in main_menu:
 # ------------------- AI ASSISTANT OPTIONS -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
-    # New Chat
+
+    # 🆕 New Chat
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.ai_mode = "new"
         st.session_state.current_topic = None
@@ -66,7 +90,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
-    # Guest Chat
+    # 👤 Guest Chat
     if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
         st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
@@ -74,11 +98,11 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
-    # Load old chats for logged-in users
+    # 📂 Load Old Chats (Logged-in Users)
     if st.session_state.logged_in and st.session_state.user:
-        if not st.session_state.user_chats and ai_sheet:
+        if not st.session_state.user_chats and sheet:
             try:
-                rows = ai_sheet.get_all_records()
+                rows = sheet.get_all_records()
                 user_chats = {}
                 username = st.session_state.user.get("username", "")
                 for row in rows:
@@ -95,11 +119,14 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             except Exception as e:
                 st.warning(f"⚠️ Failed to load chats: {e}")
 
+        # Sidebar topic selectbox (synchronized)
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
+
             def _set_topic():
-                st.session_state.current_topic = st.session_state.selected_old_topic
-                st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
+                st.session_state.ai_history = st.session_state.user_chats.get(
+                    st.session_state.current_topic, []
+                )
                 st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
                 st.rerun()
@@ -107,11 +134,11 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
-                key="selected_old_topic",
+                key="current_topic",
                 on_change=_set_topic
             )
 
-# ------------------- Agri News Sidebar -------------------
+# ------------------- Optional: Agri News Sidebar -------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📰 Agri News")
 query = st.sidebar.text_input("Keyword", value="agriculture")
@@ -125,7 +152,7 @@ def get_agri_news(q):
         url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
         res = requests.get(url).json()
         return res.get("articles", [])
-    except:
+    except Exception:
         return []
 
 for n in get_agri_news(query):
@@ -134,16 +161,21 @@ for n in get_agri_news(query):
     st.sidebar.markdown("---")
 
 # ------------------- PAGE ROUTING -------------------
-# Auto redirect logged-in users from Login to Profile
 if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
     st.session_state.page = "Profile"
     st.session_state.redirect_done = True
     st.rerun()
 
 page = st.session_state.page
-if page == "Home": home_page()
-elif page == "About": about_page()
-elif page == "AI Assistant": ai_page()
-elif page == "Contact": contact_page()
-elif page == "Login": login_page()
-elif page == "Profile": profile_page()
+if page == "Home":
+    home_page()
+elif page == "About":
+    about_page()
+elif page == "AI Assistant":
+    ai_page()
+elif page == "Contact":
+    contact_page()
+elif page == "Login":
+    login_page()
+elif page == "Profile":
+    profile_page()

@@ -1,3 +1,4 @@
+# ai_assistant.py
 import streamlit as st
 import requests
 import json
@@ -61,9 +62,6 @@ def save_chat(username, topic, question, answer):
     except:
         pass
 
-# Implement your generate_topic(), update_topic(), ask_ai() functions here
-# (same as your previous code, unchanged)
-
 # ------------------- Streamlit App -------------------
 def app():
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")
@@ -79,22 +77,13 @@ def app():
     if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED and not st.session_state.user_chats:
         st.session_state.user_chats = load_user_chats(username)
 
-    # AI page topic selection (synchronized)
-    if st.session_state.get("logged_in") and st.session_state.user_chats:
-        topics = list(st.session_state.user_chats.keys())
-        def _select_topic():
-            st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
-        st.selectbox(
-            "📚 Select a saved chat (AI Page):",
-            topics[::-1],
-            key="current_topic",  # same key as sidebar
-            on_change=_select_topic
-        )
+    # ------------------- Display Current Topic -------------------
+    topic = st.session_state.current_topic
+    if topic:
+        st.subheader(f"📘 Topic: {topic}")
+        st.session_state.ai_history = st.session_state.user_chats.get(topic, [])
 
-    # Display current topic and chat
-    if st.session_state.current_topic:
-        st.subheader(f"📘 Topic: {st.session_state.current_topic}")
-
+    # Display chat history
     if st.session_state.ai_history:
         for msg in st.session_state.ai_history:
             st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
@@ -103,9 +92,31 @@ def app():
     else:
         st.info("💬 Start a new conversation below!")
 
-    # Chat input (same as before)
+    # ------------------- Chat Input -------------------
     user_input = st.chat_input("💬 Type your question here (any language)...")
     if user_input:
         topic = st.session_state.current_topic or "New Chat"
-        # call ask_ai(), generate_topic(), append to history, save to sheet
-        # (same as your previous code)
+
+        # 1️⃣ Call your ask_ai() function to get AI response
+        answer, model = ask_ai(user_input, st.session_state.ai_history)
+
+        # 2️⃣ Append chat entry
+        chat_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "question": user_input,
+            "answer": answer
+        }
+        if topic not in st.session_state.user_chats:
+            st.session_state.user_chats[topic] = []
+        st.session_state.user_chats[topic].append(chat_entry)
+        st.session_state.ai_history.append(chat_entry)
+
+        # 3️⃣ Save to Google Sheet
+        if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+            save_chat(username, topic, user_input, answer)
+
+        # 4️⃣ Display messages
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        with st.chat_message("assistant"):
+            st.markdown(answer)
