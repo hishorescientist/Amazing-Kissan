@@ -194,7 +194,7 @@ def app():
         st.selectbox(
             "📚 Select a saved chat:",
             topics[::-1],
-            key="selected_old_topic",
+            key="ai_selected_old_topic",
             on_change=_set_topic
         )
 
