@@ -6,12 +6,10 @@ from langdetect import detect
 GOOGLE_SHEET_ENABLED = False
 sheet_ai = None
 
+# utils.py (add at the bottom)
 def init_ai_sheet(sheet_name="ai data"):
-    """Initialize AI chat sheet connection"""
-    global sheet_ai, GOOGLE_SHEET_ENABLED
-    sheet_ai = connect_google_sheet(sheet_name)
-    GOOGLE_SHEET_ENABLED = sheet_ai is not None
-    return sheet_ai
+    """Initialize or connect to AI Google Sheet."""
+    return connect_google_sheet(sheet_name)
 
 def detect_language_text(text):
     try:
