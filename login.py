@@ -91,7 +91,7 @@ def app():
     """, height=0)
 
     # --- Listen for messages (auto-login trigger) ---
-    msg = st.experimental_get_query_params().get("auto_login_trigger", [None])[0]
+    msg = st.query_params().get("auto_login_trigger", [None])[0]
 
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
