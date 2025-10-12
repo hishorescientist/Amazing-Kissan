@@ -1,62 +1,145 @@
-# login.py
+#login page
 import streamlit as st
-from utils import connect_google_sheet, hash_password, save_user, verify_user
+import hashlib
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Connect to Google Sheet for users
-sheet_users = connect_google_sheet("User")
+# --------------------------------------------------------
+# 🔑 GOOGLE SHEET SETUP
+# --------------------------------------------------------
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
+@st.cache_resource(show_spinner=False)
+def connect_google_sheet():
+    """Connect to Google Sheet using credentials from st.secrets."""
+    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
+        st.warning("⚠️ Google credentials missing in secrets.")
+        return None
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("Sheet1")
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        return None
+
+
+# --------------------------------------------------------
+# 🔐 AUTH FUNCTIONS
+# --------------------------------------------------------
+def hash_password(password):
+    """Securely hash a password using SHA256."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_all_users(sheet):
+    """Get all users from the sheet."""
+    if not sheet:
+        return []
+    try:
+        return sheet.get_all_records()
+    except Exception:
+        return []
+
+def save_user(sheet, user):
+    """Add or update user details in Google Sheet."""
+    if not sheet:
+        return False
+    users = get_all_users(sheet)
+    usernames = [u["username"] for u in users]
+    row = [
+        user.get("username",""),
+        user.get("password",""),
+        user.get("name",""),
+        user.get("email",""),
+        user.get("phone",""),
+        user.get("address",""),
+        user.get("dob","")
+    ]
+    try:
+        if user["username"] in usernames:
+            idx = usernames.index(user["username"]) + 2  # Skip header row
+            sheet.update(f"A{idx}:G{idx}", [row])
+        else:
+            sheet.append_row(row)
+        return True
+    except Exception as e:
+        st.error(f"❌ Error saving user: {e}")
+        return False
+
+def verify_user(sheet, username, password):
+    """Validate login credentials."""
+    hashed = hash_password(password)
+    users = get_all_users(sheet)
+    return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
+
+
+# --------------------------------------------------------
+# 🧑 LOGIN PAGE APP FUNCTION
+# --------------------------------------------------------
 def app():
-    st.title("🔑 Login / Register")
+    """Login and Registration UI."""
+    sheet = connect_google_sheet()
 
-    tab = st.radio("Choose an action:", ["Login", "Register"], horizontal=True)
+    # Initialize session variables safely
+    st.session_state.setdefault("logged_in", False)
+    st.session_state.setdefault("user", None)
 
-    if tab == "Login":
-        st.subheader("Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            if not username or not password:
-                st.warning("❌ Please enter both username and password.")
-            else:
-                user = verify_user(sheet_users, username, password)
-                if user:
-                    st.session_state.logged_in = True
-                    st.session_state.user = user
-                    st.session_state.page = "Profile"
-                    st.session_state.redirect_done = True
-                    st.success(f"✅ Welcome back, {user.get('name', username)}!")
-                    st.experimental_rerun()
+    if not st.session_state.logged_in:
+        st.title("🔐 Login / Register")
+        login_tab, register_tab = st.tabs(["Login", "Register"])
+
+        # ---------------- LOGIN TAB ----------------
+        with login_tab:
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+
+            if st.button("Login", use_container_width=True):
+                if not username or not password:
+                    st.warning("⚠️ Fill in both fields.")
                 else:
-                    st.error("❌ Invalid username or password.")
+                    user = verify_user(sheet, username, password)
+                    if user:
+                        st.session_state.logged_in = True
+                        st.session_state.user = user
+                        st.session_state.page = "Profile"
+                        st.success(f"✅ Welcome {user['username']}! Redirecting to your profile...")
+                        st.session_state.page = "Profile"
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid username or password.")
 
-    elif tab == "Register":
-        st.subheader("Register a new account")
-        username = st.text_input("Username", key="reg_username")
-        password = st.text_input("Password", type="password", key="reg_password")
-        name = st.text_input("Full Name")
-        email = st.text_input("Email")
-        phone = st.text_input("Phone")
-        address = st.text_area("Address")
-        dob = st.date_input("Date of Birth")
+        # ---------------- REGISTER TAB ----------------
+        with register_tab:
+            new_user = st.text_input("New Username")
+            new_pass = st.text_input("New Password", type="password")
 
-        if st.button("Register"):
-            if not username or not password or not name:
-                st.warning("❌ Username, password, and name are required.")
-            else:
-                hashed_password = hash_password(password)
-                user_data = {
-                    "username": username.strip(),
-                    "password": hashed_password,
-                    "name": name.strip(),
-                    "email": email.strip(),
-                    "phone": phone.strip(),
-                    "address": address.strip(),
-                    "dob": str(dob)
-                }
-                success = save_user(sheet_users, user_data)
-                if success:
-                    st.success("✅ Registration successful! Please login.")
-                    st.session_state.page = "Login"
-                    st.experimental_rerun()
+            if st.button("Register", use_container_width=True):
+                if not new_user or not new_pass:
+                    st.error("❌ Fill all fields.")
                 else:
-                    st.error("❌ Registration failed. Try a different username.")
+                    users = get_all_users(sheet)
+                    if any(u.get("username")==new_user.strip() for u in users):
+                        st.warning("⚠️ Username already exists.")
+                    else:
+                        user_dict = {
+                            "username": new_user.strip(),
+                            "password": hash_password(new_pass.strip()),
+                            "name":"",
+                            "email":"",
+                            "phone":"",
+                            "address":"",
+                            "dob":""
+                        }
+                        if save_user(sheet, user_dict):
+                            st.success("✅ Registration successful! You can now log in.")
+
+    else:
+        # If already logged in → move to profile
+        st.session_state.page = "Profile"
+        st.rerun()
