@@ -79,20 +79,17 @@ def app():
     sheet = connect_google_sheet()
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
-
     # --- Load stored user from browser localStorage ---
     components.html("""
         <script>
         const storedUser = localStorage.getItem("logged_in_user");
         if (storedUser) {
+            // Automatically tell Streamlit to rerun
             window.parent.postMessage({type: "auto_login", user: storedUser}, "*");
         }
         </script>
     """, height=0)
-
-    # --- Listen for messages (auto-login trigger) ---
-    msg = st.query_params().get("auto_login_trigger", [None])[0]
-
+    
     if not st.session_state.logged_in:
         st.title("🔐 Login / Register")
         login_tab, register_tab = st.tabs(["Login", "Register"])
