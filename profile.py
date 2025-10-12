@@ -61,3 +61,4 @@ def app():
     # Redirect to login page
         st.session_state.page = "Login"
         st.success("✅ Logged out successfully.")
+        st.rerun()
