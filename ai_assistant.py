@@ -170,6 +170,11 @@ def ask_ai(question, history):
 
 # ------------------- STREAMLIT APP -------------------
 def app():
+    # Keep sidebar and assistant selectboxes in sync
+    if "sidebar_shared_topic" in st.session_state:
+        st.session_state.assistant_shared_topic = st.session_state.sidebar_shared_topic
+    elif "assistant_shared_topic" in st.session_state:
+        st.session_state.sidebar_shared_topic = st.session_state.assistant_shared_topic
     st.title("🌾 AI Assistant for Farmers (All Languages → English)")
 
     # Session defaults
@@ -188,13 +193,13 @@ def app():
         topics = list(st.session_state.user_chats.keys())
 
         def _set_topic():
-            st.session_state.current_topic = st.session_state.selected_old_topic
+            st.session_state.current_topic = st.session_state.ai_selected_old_topic
             st.session_state.ai_history = st.session_state.user_chats.get(st.session_state.current_topic, [])
 
         st.selectbox(
             "📚 Select a saved chat:",
             topics[::-1],
-            key="selected_old_topic",
+            key="ai_selected_old_topic",
             on_change=_set_topic
         )
 
