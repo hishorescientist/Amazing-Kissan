@@ -4,6 +4,7 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import hashlib
+from datetime import datetime
 
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
@@ -22,10 +23,6 @@ def connect_google_sheet(sheet_name="Sheet1"):
     except Exception as e:
         st.warning(f"⚠️ Could not connect to Google Sheet: {e}")
         return None
-
-def init_ai_sheet():
-    """Dedicated sheet for AI chats."""
-    return connect_google_sheet("ai data")
 
 # ------------------- PASSWORD -------------------
 def hash_password(password):
@@ -66,3 +63,25 @@ def verify_user(sheet, username, password):
     hashed = hash_password(password)
     users = get_all_users(sheet)
     return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
+
+
+# ------------------- AI CHAT SHEET -------------------
+def init_ai_sheet():
+    """Connect to AI Google Sheet for chat storage"""
+    return connect_google_sheet(sheet_name="ai data")
+
+def save_chat(username, topic, question, answer):
+    """Append a chat message to AI Google Sheet"""
+    sheet = init_ai_sheet()
+    if not sheet:
+        return
+    try:
+        sheet.append_row([
+            username,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            topic,
+            question,
+            answer
+        ])
+    except Exception as e:
+        st.warning(f"⚠️ Failed to save chat: {e}")
