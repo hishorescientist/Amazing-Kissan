@@ -3,6 +3,7 @@ import streamlit as st
 import hashlib
 import json
 import gspread
+from datetime import date
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --------------------------------------------------------
@@ -138,7 +139,7 @@ def app():
             """, unsafe_allow_html=True)
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
             new_address = st.text_input("Address")
-            new_dob = st.text_input("Date of Birth") 
+            new_dob = st.text_input("Date of Birth", value=date(2000, 1, 1), min_value=date(1900, 1, 1), max_value=date.today())
             
             
 
