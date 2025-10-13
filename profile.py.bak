@@ -1,5 +1,63 @@
+# profile.py
 import streamlit as st
-from login import connect_google_sheet, save_user
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# --------------------------------------------------------
+# 🌐 GOOGLE SHEET CONNECTION
+# --------------------------------------------------------
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def connect_google_sheet(sheet_name="Sheet1"):
+    """Connect to Google Sheet."""
+    try:
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet(sheet_name)
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to Google Sheet: {e}")
+        return None
+
+
+def get_all_users(sheet):
+    try:
+        return sheet.get_all_records()
+    except:
+        return []
+
+
+def save_user(sheet, user):
+    """Save or update user details in Google Sheet."""
+    if not sheet:
+        return False
+    users = get_all_users(sheet)
+    usernames = [u["username"] for u in users]
+    row = [
+        user.get("username", ""),
+        user.get("password", ""),
+        user.get("name", ""),
+        user.get("email", ""),
+        user.get("phone", ""),
+        user.get("address", ""),
+        user.get("dob", "")
+    ]
+    try:
+        if user["username"] in usernames:
+            idx = usernames.index(user["username"]) + 2
+            sheet.update(f"A{idx}:G{idx}", [row])
+        else:
+            sheet.append_row(row)
+        return True
+    except Exception as e:
+        st.error(f"❌ Error saving user: {e}")
+        return False
+
 
 # --------------------------------------------------------
 # 👤 PROFILE PAGE
@@ -8,7 +66,7 @@ def app():
     """User Profile Page."""
     st.title("👤 User Profile")
 
-    # Ensure session and login state
+    # Ensure user is logged in
     if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("⚠️ Please log in first.")
         st.session_state.page = "Login"
@@ -53,8 +111,9 @@ def app():
     # ----------------------------------------------------
     st.markdown("---")
     if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user = None
+        for key in ["logged_in", "user", "current_topic", "ai_history", "ai_mode"]:
+            if key in st.session_state:
+                del st.session_state[key]
         st.session_state.page = "Login"
         st.success("✅ Logged out successfully.")
         st.rerun()
