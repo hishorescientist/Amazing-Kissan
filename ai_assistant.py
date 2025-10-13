@@ -227,28 +227,26 @@ def app():
             "answer": answer
         }
 
+        # Temporarily store under current topic
         if topic not in st.session_state.user_chats:
             st.session_state.user_chats[topic] = []
         st.session_state.user_chats[topic].append(chat_entry)
         st.session_state.ai_history.append(chat_entry)
 
-        # Optional: update topic dynamically after 3 messages
+        # Check for topic update
+        new_topic = None
         if len(st.session_state.ai_history) >= 3:
             new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
-            if new_topic:
+            if new_topic and new_topic != topic:
+                # Move chat history to new topic
+                st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop(topic)
                 st.session_state.current_topic = new_topic
+                topic = new_topic
 
-        # Display messages
-        with st.chat_message("user"):
-            st.markdown(user_input)
-        with st.chat_message("assistant"):
-            st.markdown(answer)
-
-        # Save chat only if logged in
+        # Now save only once (under final topic)
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
-            save_chat(username, st.session_state.current_topic, user_input, answer)
+            save_chat(username, topic, user_input, answer)
         else:
-            # Guest chat stored in session only
             st.session_state["guest_chats"] = st.session_state.get("guest_chats", {})
             if topic not in st.session_state["guest_chats"]:
                 st.session_state["guest_chats"][topic] = []
