@@ -117,11 +117,20 @@ def app():
         # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
-            new_pass = st.text_input("New Password", type="password")
+            new_pass = st.text_input("Password", type="password")
+            new_re_pass = st.text_input("Again type Password", type="password")
+            new_email = st.text_input("Email")
+            new_number = st.text_input("Phone Number")
+            new_address = st.text_input("Address")
+            new_dob = st.text_input("Date of Birth") 
+            
+            
 
             if st.button("Register", use_container_width=True):
-                if not new_user or not new_pass:
+                if not new_user or not new_pass or not :
                     st.error("❌ Fill all fields.")
+                if new_pass != new_re_pass:
+                    st.error("type same password on both.")
                 else:
                     users = get_all_users(sheet)
                     if any(u.get("username")==new_user.strip() for u in users):
@@ -130,11 +139,11 @@ def app():
                         user_dict = {
                             "username": new_user.strip(),
                             "password": hash_password(new_pass.strip()),
-                            "name":"",
-                            "email":"",
-                            "phone":"",
-                            "address":"",
-                            "dob":""
+                            "name": new_user.strip(),
+                            "email":new_email.strip(),
+                            "phone":new_number.strip(),
+                            "address":new_address.strip(),
+                            "dob":new_dob.strip()
                         }
                         if save_user(sheet, user_dict):
                             st.success("✅ Registration successful! You can now log in.")
