@@ -188,19 +188,19 @@ def app():
     if "ai_history" not in st.session_state:
         st.session_state.ai_history = []
 
-    # If no current topic, default to "New Chat"
+    # Default to New Chat if nothing selected
     if st.session_state.current_topic is None:
         st.session_state.current_topic = "New Chat"
 
     topic = st.session_state.current_topic
 
-    # Load ai_history from existing topic if it's not a brand new chat
+    # Load previous messages for existing topic
     if topic != "New Chat" and not st.session_state.ai_history:
         st.session_state.ai_history = st.session_state.user_chats.get(topic, [])
 
     st.subheader(f"📘 Topic: {topic}")
 
-    # Show previous chat
+    # Display previous messages
     if st.session_state.ai_history:
         for msg in st.session_state.ai_history:
             st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
@@ -209,7 +209,7 @@ def app():
     else:
         st.info("💬 Start chatting below!")
 
-    # Get user input
+    # Chat input
     user_input = st.chat_input("💬 Type your question here...")
 
     if user_input:
@@ -217,9 +217,9 @@ def app():
         st.rerun()
 
     if "pending_input" in st.session_state:
-        question = st.session_state["pending_input"]
-        del st.session_state["pending_input"]
+        question = st.session_state.pop("pending_input")
 
+        # AI history for context
         history = st.session_state.ai_history.copy()
         answer, _ = ask_ai(question, history)
 
@@ -229,21 +229,22 @@ def app():
             "answer": answer
         }
 
+        # If it’s the first message under "New Chat", generate a new topic
+        if topic == "New Chat" and len(st.session_state.ai_history) == 0:
+            new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
+            st.session_state.user_chats[new_topic] = []
+            st.session_state.current_topic = new_topic
+            topic = new_topic
+
         # Append to current topic
         st.session_state.ai_history.append(chat_entry)
         st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
 
-        # Only generate a new topic if this is a brand new chat with no previous messages
-        if topic == "New Chat" and len(st.session_state.ai_history) == 1:
-            new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
-            st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop("New Chat")
-            st.session_state.current_topic = new_topic
-            topic = new_topic
+        # Save to Google Sheet if logged in
+        if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+            save_chat(username, topic, question, answer)
 
-        # Save to Google Sheet
-        save_chat(username, topic, question, answer)
-
-        # Display immediately
+        # Display instantly
         with st.chat_message("user"):
             st.markdown(question)
         with st.chat_message("assistant"):
