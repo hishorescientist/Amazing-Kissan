@@ -188,19 +188,25 @@ def app():
     if "ai_history" not in st.session_state:
         st.session_state.ai_history = []
 
-    # Default topic for new chat
+    # If no current topic, default to "New Chat"
     if st.session_state.current_topic is None:
         st.session_state.current_topic = "New Chat"
 
     topic = st.session_state.current_topic
+
+    # Load ai_history from existing topic if it's not a brand new chat
+    if topic != "New Chat" and not st.session_state.ai_history:
+        st.session_state.ai_history = st.session_state.user_chats.get(topic, [])
+
     st.subheader(f"📘 Topic: {topic}")
 
     # Show previous chat
-    for msg in st.session_state.ai_history:
-        st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
-        st.markdown(f"**🤖 AI:** {msg['answer']}")
-        st.markdown("---")
-    if not st.session_state.ai_history:
+    if st.session_state.ai_history:
+        for msg in st.session_state.ai_history:
+            st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
+            st.markdown(f"**🤖 AI:** {msg['answer']}")
+            st.markdown("---")
+    else:
         st.info("💬 Start chatting below!")
 
     # Get user input
@@ -227,7 +233,7 @@ def app():
         st.session_state.ai_history.append(chat_entry)
         st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
 
-        # Only generate a new topic for the very first message of a brand new chat
+        # Only generate a new topic if this is a brand new chat with no previous messages
         if topic == "New Chat" and len(st.session_state.ai_history) == 1:
             new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
             st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop("New Chat")
