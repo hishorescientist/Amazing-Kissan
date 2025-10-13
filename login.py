@@ -138,10 +138,6 @@ def app():
             """, unsafe_allow_html=True)
 
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
-            import re
-            phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
-            if not phone_pattern.match(new_number.strip()):
-                st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
             new_address = st.text_input("Address")
             new_dob = st.text_input("Date of Birth") 
             
@@ -150,19 +146,22 @@ def app():
             if st.button("Register", use_container_width=True):
                 if not new_user or not new_pass or not new_re_pass or not new_email or not new_number or not new_address or not new_dob :
                     st.error("❌ Fill all fields.")
-                
                 else:
-                    user_dict = {
-                        "username": new_user.strip(),
-                        "password": hash_password(new_pass.strip()),
-                        "name": new_user.strip(),
-                        "email":new_email.strip(),
-                        "phone":new_number.strip(),
-                        "address":new_address.strip(),
-                        "dob":new_dob.strip()
-                    }
-                    if save_user(sheet, user_dict):
-                        st.success("✅ Registration successful! You can now log in.")
+                    import re
+                    phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
+                    if not phone_pattern.match(new_number.strip()):
+                        st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
+                            user_dict = {
+                                "username": new_user.strip(),
+                                "password": hash_password(new_pass.strip()),
+                                "name": new_user.strip(),
+                                "email":new_email.strip(),
+                                "phone":new_number.strip(),
+                                "address":new_address.strip(),
+                                "dob":new_dob.strip()
+                            }
+                            if save_user(sheet, user_dict):
+                                st.success("✅ Registration successful! You can now log in.")
 
     else:
         # If already logged in → move to profile
