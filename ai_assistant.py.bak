@@ -203,7 +203,7 @@ def app():
     st.subheader(f"📘 Topic: {st.session_state.current_topic}")
 
     # Display chat history
-    for msg in st.session_state.ai_history+1:
+    for msg in st.session_state.ai_history:
         st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
         st.markdown(f"**🤖 AI:** {msg['answer']}")
         st.markdown("---")
