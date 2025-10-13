@@ -111,9 +111,19 @@ def app():
     # ----------------------------------------------------
     st.markdown("---")
     if st.button("🚪 Logout", use_container_width=True):
-        for key in ["logged_in", "user", "current_topic", "ai_history", "ai_mode"]:
+        # Clear all relevant session data
+        keys_to_clear = [
+            "logged_in", "user", "page",
+            "ai_history", "ai_mode",
+            "current_topic", "user_chats",
+            "selected_old_topic", "ai_selected_old_topic"
+        ]
+        for key in keys_to_clear:
             if key in st.session_state:
                 del st.session_state[key]
+
+        # Force redirect to Login page
         st.session_state.page = "Login"
         st.success("✅ Logged out successfully.")
+        st.experimental_set_query_params()  # clears URL params
         st.rerun()
