@@ -166,6 +166,7 @@ def ask_ai(question, history):
 
 
 # ------------------- STREAMLIT APP -------------------
+# ------------------- STREAMLIT APP -------------------
 def app():
     st.title("🌾 AI Assistant for Farmers")
 
@@ -183,26 +184,28 @@ def app():
 
     # Initialize session variables
     if "current_topic" not in st.session_state:
-        st.session_state.current_topic = "New Chat"
+        st.session_state.current_topic = None
     if "ai_history" not in st.session_state:
         st.session_state.ai_history = []
+
+    # Default topic for new chat
+    if st.session_state.current_topic is None:
+        st.session_state.current_topic = "New Chat"
 
     topic = st.session_state.current_topic
     st.subheader(f"📘 Topic: {topic}")
 
     # Show previous chat
-    if st.session_state.ai_history:
-        for msg in st.session_state.ai_history:
-            st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
-            st.markdown(f"**🤖 AI:** {msg['answer']}")
-            st.markdown("---")
-    else:
+    for msg in st.session_state.ai_history:
+        st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
+        st.markdown(f"**🤖 AI:** {msg['answer']}")
+        st.markdown("---")
+    if not st.session_state.ai_history:
         st.info("💬 Start chatting below!")
 
     # Get user input
     user_input = st.chat_input("💬 Type your question here...")
 
-    # Handle chat instantly
     if user_input:
         st.session_state["pending_input"] = user_input
         st.rerun()
@@ -220,21 +223,21 @@ def app():
             "answer": answer
         }
 
-        # Update local state
+        # Append to current topic
         st.session_state.ai_history.append(chat_entry)
         st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
 
-        # Auto topic naming (only first response)
+        # Only generate a new topic for the very first message of a brand new chat
         if topic == "New Chat" and len(st.session_state.ai_history) == 1:
             new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
-            st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop(topic)
+            st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop("New Chat")
             st.session_state.current_topic = new_topic
             topic = new_topic
 
         # Save to Google Sheet
         save_chat(username, topic, question, answer)
 
-        # Show message instantly
+        # Display immediately
         with st.chat_message("user"):
             st.markdown(question)
         with st.chat_message("assistant"):
