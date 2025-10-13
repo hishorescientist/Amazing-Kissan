@@ -120,7 +120,19 @@ def app():
             new_pass = st.text_input("Password", type="password")
             new_re_pass = st.text_input("Again type Password", type="password")
             new_email = st.text_input("Email")
-            new_number = st.text_input("Phone Number")
+            st.markdown("""
+                <style>
+                input[type=tel] {
+                    width: 100%;
+                    padding: 8px;
+                    font-size: 16px;
+                    border-radius: 5px;
+                    border: 1px solid #ccc;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            new_number = st.text_input("Phone Number", placeholder="+91 98765 43210", key="phone")
             new_address = st.text_input("Address")
             new_dob = st.text_input("Date of Birth") 
             

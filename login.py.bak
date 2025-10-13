@@ -127,7 +127,7 @@ def app():
             
 
             if st.button("Register", use_container_width=True):
-                if not new_user or not new_pass or not :
+                if not new_user or not new_pass :
                     st.error("❌ Fill all fields.")
                 elif new_pass != new_re_pass:
                     st.error("type same password on both.")
