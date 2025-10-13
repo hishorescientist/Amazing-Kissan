@@ -124,7 +124,7 @@ def app():
             new_re_pass = st.text_input("Again type Password", type="password")
             if new_pass != new_re_pass:
                     st.error("type same password on both.")
-            new_email = st.text_input("Email")
+            new_email = st.text_input("Email", placeholder="your.email@gmail.com")
             st.markdown("""
                 <style>
                 input[type=tel] {

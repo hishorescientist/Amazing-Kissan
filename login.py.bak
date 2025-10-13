@@ -161,7 +161,7 @@ def app():
                             "dob":new_dob.strip()
                         }
                         if save_user(sheet, user_dict):
-                                st.success("✅ Registration successful! You can now log in.")
+                            st.success("✅ Registration successful! You can now log in.")
 
     else:
         # If already logged in → move to profile
