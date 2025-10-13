@@ -117,6 +117,9 @@ def app():
         # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
+            users = get_all_users(sheet)
+            if any(u.get("username")==new_user.strip() for u in users):
+                st.warning("⚠️ Username already exists.")
             new_pass = st.text_input("Password", type="password")
             new_re_pass = st.text_input("Again type Password", type="password")
             new_email = st.text_input("Email")
@@ -132,7 +135,11 @@ def app():
                 </style>
             """, unsafe_allow_html=True)
 
-            new_number = st.text_input("Phone Number", placeholder="+91 98765 43210", key="phone")
+            new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
+            import re
+            phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
+            if not phone_pattern.match(new_number.strip()):
+                st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
             new_address = st.text_input("Address")
             new_dob = st.text_input("Date of Birth") 
             
