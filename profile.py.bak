@@ -84,7 +84,7 @@ def app():
         email = st.text_input("Email", user.get("email", ""))
         phone = st.text_input("Phone", user.get("phone", ""))
         address = st.text_area("Address", user.get("address", ""))
-        dob = st.date_input("Date of Birth", user.get("dob") or None)
+        dob = st.date_input("Date of Birth", value=date(2000, 1, 1), min_value=date(1900, 1, 1), max_value=date.today(), user.get("dob") or None)
 
         save_btn = st.form_submit_button("💾 Save Changes")
 
