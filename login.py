@@ -136,7 +136,6 @@ def app():
                 }
                 </style>
             """, unsafe_allow_html=True)
-
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
             new_address = st.text_input("Address")
             new_dob = st.text_input("Date of Birth") 
@@ -151,17 +150,18 @@ def app():
                     phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
                     if not phone_pattern.match(new_number.strip()):
                         st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
-                            user_dict = {
-                                "username": new_user.strip(),
-                                "password": hash_password(new_pass.strip()),
-                                "name": new_user.strip(),
-                                "email":new_email.strip(),
-                                "phone":new_number.strip(),
-                                "address":new_address.strip(),
-                                "dob":new_dob.strip()
-                            }
-                            if save_user(sheet, user_dict):
-                                st.success("✅ Registration successful! You can now log in.")
+                    else:
+                        user_dict = {
+                            "username": new_user.strip(),
+                            "password": hash_password(new_pass.strip()),
+                            "name": new_user.strip(),
+                            "email":new_email.strip(),
+                            "phone":new_number.strip(),
+                            "address":new_address.strip(),
+                            "dob":new_dob.strip()
+                        }
+                        if save_user(sheet, user_dict):
+                            st.success("✅ Registration successful! You can now log in.")
 
     else:
         # If already logged in → move to profile
