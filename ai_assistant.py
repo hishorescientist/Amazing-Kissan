@@ -202,15 +202,23 @@ def app():
         st.info("💬 Start a new conversation below!")
 
     # Chat input
-    user_input = st.chat_input("💬 Type your question here (any language)...")
-    if user_input:
-        if st.session_state.current_topic is None:
-            topic = generate_topic(user_input, "First message", list(st.session_state.user_chats.keys()))
-            st.session_state.current_topic = topic
-        else:
-            topic = st.session_state.current_topic
+    # ------------------- CHAT INPUT -------------------
+user_input = st.chat_input("💬 Type your question here (any language)...")
 
-        # Include previous guest chats if user is guest
+# Handle new input instantly
+    if user_input:
+        # Store message temporarily (before rerun)
+        st.session_state["pending_input"] = user_input
+        st.rerun()
+
+    # Process the pending message (from previous run)
+    if "pending_input" in st.session_state:
+        question = st.session_state["pending_input"]
+        del st.session_state["pending_input"]
+
+        topic = st.session_state.current_topic or "New Chat"
+
+        # Build full conversation
         if not st.session_state.get("logged_in"):
             guest_memory = []
             for topic_msgs in st.session_state.get("guest_chats", {}).values():
@@ -219,35 +227,41 @@ def app():
         else:
             full_history = st.session_state.ai_history
 
-        answer, model = ask_ai(user_input, full_history)
+        # Ask AI
+        answer, model = ask_ai(question, full_history)
 
         chat_entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "question": user_input,
+            "question": question,
             "answer": answer
         }
 
-        # Temporarily store under current topic
+        # Add to chat memory
         if topic not in st.session_state.user_chats:
             st.session_state.user_chats[topic] = []
         st.session_state.user_chats[topic].append(chat_entry)
         st.session_state.ai_history.append(chat_entry)
 
-        # Check for topic update
+        # Update topic dynamically
         new_topic = None
         if len(st.session_state.ai_history) >= 3:
             new_topic = update_topic(st.session_state.ai_history, list(st.session_state.user_chats.keys()))
             if new_topic and new_topic != topic:
-                # Move chat history to new topic
                 st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop(topic)
                 st.session_state.current_topic = new_topic
                 topic = new_topic
 
-        # Now save only once (under final topic)
+        # Save chat to sheet or session
         if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
-            save_chat(username, topic, user_input, answer)
+            save_chat(username, topic, question, answer)
         else:
             st.session_state["guest_chats"] = st.session_state.get("guest_chats", {})
             if topic not in st.session_state["guest_chats"]:
                 st.session_state["guest_chats"][topic] = []
             st.session_state["guest_chats"][topic].append(chat_entry)
+
+        # Display immediately
+        with st.chat_message("user"):
+            st.markdown(question)
+        with st.chat_message("assistant"):
+            st.markdown(answer)
