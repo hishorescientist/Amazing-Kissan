@@ -132,7 +132,7 @@ def app():
                 </style>
             """, unsafe_allow_html=True)
 
-            new_number = st.text_input("Phone Number", placeholder="+91 98765 43210", key="phone")
+            new_number = st.text_input("Phone Number", placeholder="+91 9876543210", key="phone")
             new_address = st.text_input("Address")
             new_dob = st.text_input("Date of Birth") 
             
@@ -147,7 +147,7 @@ def app():
                 else:
             # ✅ Phone number validation
                    import re
-                   phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
+                   phone_pattern = re.compile(r'^\+?\d{1,3}?\d{13}$')
                    if not phone_pattern.match(new_number.strip()):
                        st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
                    else:
