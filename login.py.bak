@@ -129,8 +129,7 @@ def app():
             if st.button("Register", use_container_width=True):
                 if not new_user or not new_pass or not :
                     st.error("❌ Fill all fields.")
-                if new_pass != new_re_pass:
-                    st.error("type same password on both.")
+                
                 else:
                     users = get_all_users(sheet)
                     if any(u.get("username")==new_user.strip() for u in users):
