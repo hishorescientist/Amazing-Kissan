@@ -171,27 +171,36 @@ def app():
     st.title("🌾 AI Assistant for Farmers")
 
     # Ensure login
-    logged_in = st.session_state.get("logged_in", False)
-    username = st.session_state.user["username"] if logged_in else "Guest"
+    if not st.session_state.get("logged_in"):
+        st.session_state.page = "Login"
+        st.warning("🔒 Please log in first.")
+        st.stop()
 
-    # Load previous chats for logged-in users
-    if logged_in and GOOGLE_SHEET_ENABLED and not st.session_state.get("user_chats"):
+    username = st.session_state.user["username"]
+
+    # Load previous chats once
+    if GOOGLE_SHEET_ENABLED and not st.session_state.get("user_chats"):
         st.session_state.user_chats = load_user_chats(username)
-    elif "user_chats" not in st.session_state:
-        st.session_state.user_chats = {}
 
     # Initialize session variables
     if "current_topic" not in st.session_state:
-        st.session_state.current_topic = "New Chat"
+        st.session_state.current_topic = None
     if "ai_history" not in st.session_state:
         st.session_state.ai_history = []
 
+    # If no current topic, default to "New Chat"
+    if st.session_state.current_topic is None:
+        st.session_state.current_topic = "New Chat"
+
     topic = st.session_state.current_topic
 
-    # Display current topic
+    # Load ai_history from existing topic if it's not a brand new chat
+    if topic != "New Chat" and not st.session_state.ai_history:
+        st.session_state.ai_history = st.session_state.user_chats.get(topic, [])
+
     st.subheader(f"📘 Topic: {topic}")
 
-    # Display chat history
+    # Show previous chat
     if st.session_state.ai_history:
         for msg in st.session_state.ai_history:
             st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
@@ -200,23 +209,18 @@ def app():
     else:
         st.info("💬 Start chatting below!")
 
-    # Chat input
+    # Get user input
     user_input = st.chat_input("💬 Type your question here...")
 
-    # Handle first input instantly
     if user_input:
         st.session_state["pending_input"] = user_input
         st.rerun()
 
-    # Process pending input
     if "pending_input" in st.session_state:
         question = st.session_state["pending_input"]
         del st.session_state["pending_input"]
 
-        # Build conversation history
         history = st.session_state.ai_history.copy()
-
-        # Ask AI
         answer, _ = ask_ai(question, history)
 
         chat_entry = {
@@ -225,33 +229,21 @@ def app():
             "answer": answer
         }
 
-        # Add to session memory
+        # Append to current topic
         st.session_state.ai_history.append(chat_entry)
-        if logged_in:
-            st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
-        else:
-            st.session_state.setdefault("guest_chats", {})
-            st.session_state["guest_chats"].setdefault(topic, []).append(chat_entry)
+        st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
 
-        # Auto-generate topic for first message of New Chat
+        # Only generate a new topic if this is a brand new chat with no previous messages
         if topic == "New Chat" and len(st.session_state.ai_history) == 1:
-            existing_topics = list(st.session_state.user_chats.keys()) if logged_in else []
-            new_topic = generate_topic(question, answer, existing_topics)
-
-            # Rename session memory
-            if logged_in:
-                st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop("New Chat")
-            else:
-                st.session_state["guest_chats"][new_topic] = st.session_state["guest_chats"].pop("New Chat")
-
+            new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
+            st.session_state.user_chats[new_topic] = st.session_state.user_chats.pop("New Chat")
             st.session_state.current_topic = new_topic
             topic = new_topic
 
-        # Save to Google Sheet if logged in
-        if logged_in and GOOGLE_SHEET_ENABLED:
-            save_chat(username, topic, question, answer)
+        # Save to Google Sheet
+        save_chat(username, topic, question, answer)
 
-        # Display instantly
+        # Display immediately
         with st.chat_message("user"):
             st.markdown(question)
         with st.chat_message("assistant"):
