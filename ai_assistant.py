@@ -1,3 +1,4 @@
+# ai_assistant.py
 import streamlit as st
 import requests
 import json
@@ -26,7 +27,6 @@ def connect_google_sheet():
 
 sheet = connect_google_sheet()
 GOOGLE_SHEET_ENABLED = sheet is not None
-
 
 # ------------------- HELPER FUNCTIONS -------------------
 def detect_language(text):
@@ -99,41 +99,11 @@ def generate_topic(question, answer, existing_topics):
         except:
             pass
 
+    # Avoid duplicates
     for existing in existing_topics:
         if topic.lower() in existing.lower() or existing.lower() in topic.lower():
             return existing
     return topic
-
-def update_topic(messages, existing_topics):
-    """Generate a dynamic topic based on recent messages"""
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key or not messages:
-        return None
-
-    chat_text = "\n".join([f"Q: {m['question']}\nA: {m['answer']}" for m in messages[-5:]])
-    prompt = f"Provide a concise 3-5 word English topic summarizing this conversation:\n{chat_text}"
-
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    data = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": "You output short English topics only."},
-            {"role": "user", "content": prompt}
-        ]
-    }
-
-    try:
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                             headers=headers, json=data, timeout=15)
-        if resp.status_code == 200:
-            topic = resp.json()["choices"][0]["message"]["content"].strip()
-            for existing in existing_topics:
-                if topic.lower() in existing.lower() or existing.lower() in topic.lower():
-                    return existing
-            return topic
-    except:
-        pass
-    return None
 
 def ask_ai(question, history):
     """Ask AI using Groq API"""
@@ -166,13 +136,11 @@ def ask_ai(question, history):
 
 
 # ------------------- STREAMLIT APP -------------------
-# ------------------- STREAMLIT APP -------------------
 def app():
     st.title("🌾 AI Assistant for Farmers")
 
     # ---------------- Login Check ----------------
     if not st.session_state.get("logged_in"):
-        st.session_state.page = "Login"
         st.warning("🔒 Please log in first.")
         st.stop()
 
@@ -236,8 +204,8 @@ def app():
         st.session_state.ai_history.append(chat_entry)
         st.session_state.user_chats.setdefault(topic, []).append(chat_entry)
 
-        # ---------------- Save to Google Sheet if logged in ----------------
-        if st.session_state.get("logged_in") and GOOGLE_SHEET_ENABLED:
+        # ---------------- Save to Google Sheet ----------------
+        if GOOGLE_SHEET_ENABLED:
             save_chat(username, topic, question, answer)
 
         # ---------------- Display Instantly ----------------

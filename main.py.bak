@@ -100,8 +100,8 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.rerun()
 
     # Load old chats for logged-in user
-    if st.session_state.logged_in and st.session_state.user:
-        if not st.session_state.user_chats and sheet:
+    if st.session_state.logged_in and st.session_state.user and sheet:
+        if not st.session_state.user_chats:
             try:
                 rows = sheet.get_all_records()
                 user_chats = {}
@@ -123,8 +123,8 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
 
-            def _set_topic():
-                st.session_state.current_topic = st.session_state.selected_old_topic
+            def set_old_topic():
+                st.session_state.current_topic = st.session_state.selected_old_topic_main
                 st.session_state.ai_history = st.session_state.user_chats.get(
                     st.session_state.current_topic, []
                 )
@@ -135,8 +135,8 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
-                key="selected_old_topic",
-                on_change=_set_topic
+                key="selected_old_topic_main",
+                on_change=set_old_topic
             )
 
 # ------------------- OPTIONAL: Agri News -------------------
