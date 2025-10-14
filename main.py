@@ -41,14 +41,20 @@ for k, v in default_state.items():
         st.session_state[k] = v
 
 # ------------------- LOAD LOCAL STATE (ONCE) -------------------
+# ------------------- LOAD LOCAL STATE (ONCE) -------------------
 if "state_loaded" not in st.session_state:
     try:
         saved_state = load_state()
         for k, v in saved_state.items():
-            if k in default_state:
+            if k in default_state and k != "page":  # Skip overwriting page
                 st.session_state[k] = v
+        # Set page only if it exists in saved state
+        if "page" in saved_state and saved_state["page"] in default_state.keys():
+            st.session_state["page"] = saved_state["page"]
         st.session_state["state_loaded"] = True
-        st.rerun()  # Rerun to apply saved state immediately
+        # Only rerun if page is not Home to show saved page immediately
+        if st.session_state["page"] != "Home":
+            st.rerun()
     except Exception as e:
         st.warning(f"Could not load previous state: {e}")
 
