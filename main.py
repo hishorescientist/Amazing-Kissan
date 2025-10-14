@@ -6,6 +6,7 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
+from storage import save_state, load_state
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
@@ -25,6 +26,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+saved_state = load_state()
+for k, v in saved_state.items():
+    st.session_state[k] = v
 # ------------------- SESSION STATE -------------------
 default_state = {
     "page": "Home",
@@ -116,3 +120,9 @@ elif page == "Login":
     login_page()
 elif page == "Profile":
     profile_page()
+
+# Add at the very end of main.py, before script ends
+keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
+state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
+save_state(state_to_save)
+
