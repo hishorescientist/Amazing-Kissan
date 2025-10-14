@@ -13,21 +13,39 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 # Hide default menu & toolbar
 st.markdown("""
 <style>
+/* Hide Streamlit main menu */
 #MainMenu { visibility: hidden; }
-/* Hide Streamlit's floating deploy/share button */
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-    }
 
-    /* Hide any floating buttons from external wrappers */
-    .stApp > div[role="button"],
-    .stApp > div[class*="floating"],
-    .stApp button[kind="floatingActionButton"] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-    }
-[data-testid="stToolbarActions"] { visibility: hidden; }
+/* Hide Streamlit's floating deploy/share button (red paper boat) */
+[data-testid="stStatusWidget"],
+button[kind="floatingActionButton"],
+[data-testid="stActionButton"],
+[data-testid="floatingToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stAppStatusWidget"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Hide any leftover floating buttons or overlays */
+.stApp [role="button"][tabindex="0"],
+.stApp div[class*="floating"],
+.stApp div[class*="status"],
+.stApp div[title*="Deploy"],
+.stApp div[title*="Share"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Hide toolbar actions (e.g., rerun, download, etc.) */
+[data-testid="stToolbarActions"],
+[data-testid="stToolbar"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Customize sidebar toggle button */
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
