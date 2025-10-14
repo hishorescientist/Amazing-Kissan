@@ -194,10 +194,12 @@ def app():
         }
 
         # ---------------- New Topic Handling ----------------
-        if topic == "New Chat" and len(st.session_state.ai_history) == 0:
+        # ---------------- New Topic Handling ----------------
+        if topic == "New Chat" or len(st.session_state.ai_history) == 0:
             new_topic = generate_topic(question, answer, list(st.session_state.user_chats.keys()))
             st.session_state.user_chats[new_topic] = []
             st.session_state.current_topic = new_topic
+            st.session_state.ai_history = []  # start clean
             topic = new_topic
 
         # ---------------- Append to Current Topic ----------------
