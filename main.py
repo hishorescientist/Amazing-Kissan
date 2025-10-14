@@ -14,19 +14,11 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
-/* Hide Streamlit's floating deploy/share button */
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-    }
-
-    /* Hide any floating buttons from external wrappers */
-    .stApp > div[role="button"],
-    .stApp > div[class*="floating"],
-    .stApp button[kind="floatingActionButton"] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-    }
+/* 🔴 Hide Streamlit's floating Deploy/Share button */
+[data-testid="stStatusWidget"] {
+    display: none !important;
+    visibility: hidden !important;
+}
 [data-testid="stToolbarActions"] { visibility: hidden; }
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
