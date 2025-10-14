@@ -15,7 +15,7 @@ st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
 /* 🔴 Hide Streamlit's floating Deploy/Share button */
-[data-testid="stStatusWidget"] {visibility: hidden !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
 [data-testid="stToolbarActions"] { visibility: hidden; }
 [data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
