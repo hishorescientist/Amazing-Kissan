@@ -41,7 +41,6 @@ for k, v in default_state.items():
         st.session_state[k] = v
 
 # ------------------- LOAD LOCAL STATE (ONCE) -------------------
-# ------------------- LOAD LOCAL STATE (ONCE) -------------------
 if "state_loaded" not in st.session_state:
     try:
         saved_state = load_state()
