@@ -26,7 +26,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------- SESSION STATE -------------------
+# ------------------- SESSION STATE DEFAULTS -------------------
 default_state = {
     "page": "Home",
     "logged_in": False,
@@ -39,6 +39,14 @@ default_state = {
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# ------------------- LOAD LOCAL STATE -------------------
+try:
+    saved_state = load_state()
+    for k, v in saved_state.items():
+        st.session_state[k] = v
+except Exception as e:
+    st.warning(f"Could not load previous state: {e}")
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
@@ -63,7 +71,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.page = "AI Assistant"
         st.rerun()
 
-    # Load old chats for logged-in user
     if st.session_state.logged_in and st.session_state.user:
         if not st.session_state.user_chats:
             from ai_assistant import connect_google_sheet
@@ -118,4 +125,10 @@ elif page == "Login":
 elif page == "Profile":
     profile_page()
 
-
+# ------------------- SAVE LOCAL STATE -------------------
+try:
+    keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
+    state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
+    save_state(state_to_save)
+except Exception as e:
+    st.warning(f"Could not save state: {e}")

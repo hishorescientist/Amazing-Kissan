@@ -118,8 +118,4 @@ elif page == "Login":
 elif page == "Profile":
     profile_page()
 
-# Add at the very end of main.py, before script ends
-keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
-state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
-save_state(state_to_save)
 
