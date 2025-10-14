@@ -40,13 +40,17 @@ for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- LOAD LOCAL STATE -------------------
-try:
-    saved_state = load_state()
-    for k, v in saved_state.items():
-        st.session_state[k] = v
-except Exception as e:
-    st.warning(f"Could not load previous state: {e}")
+# ------------------- LOAD LOCAL STATE (ONCE) -------------------
+if "state_loaded" not in st.session_state:
+    try:
+        saved_state = load_state()
+        for k, v in saved_state.items():
+            if k in default_state:
+                st.session_state[k] = v
+        st.session_state["state_loaded"] = True
+        st.rerun()  # Rerun to apply saved state immediately
+    except Exception as e:
+        st.warning(f"Could not load previous state: {e}")
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
