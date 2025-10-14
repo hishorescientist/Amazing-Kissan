@@ -1,10 +1,5 @@
 # main.py
 import streamlit as st
-import json
-import gspread
-import requests
-from oauth2client.service_account import ServiceAccountCredentials
-
 from login import app as login_page
 from profile import app as profile_page
 from ai_assistant import app as ai_page
@@ -15,8 +10,8 @@ from contact import app as contact_page
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
-# Hide Streamlit menu & toolbar
-hide_menu = """
+# Hide default menu & toolbar
+st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
 [data-testid="stToolbarActions"] { visibility: hidden; }
@@ -26,8 +21,7 @@ hide_menu = """
     color: #FF5733;
 }
 </style>
-"""
-st.markdown(hide_menu, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ------------------- SESSION STATE -------------------
 default_state = {
@@ -35,35 +29,13 @@ default_state = {
     "logged_in": False,
     "user": None,
     "ai_history": [],
-    "ai_mode": "guest",
     "current_topic": None,
     "user_chats": {},
-    "redirect_done": False  # prevents rerun loop after login
+    "redirect_done": False
 }
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
-
-# ------------------- GOOGLE SHEET CONNECTION -------------------
-SCOPE = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def connect_google_sheet(sheet_name="ai data"):
-    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
-        return None
-    try:
-        creds_json = st.secrets["google"]["creds"]
-        creds_dict = json.loads(creds_json)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        client = gspread.authorize(creds)
-        return client.open("User").worksheet(sheet_name)
-    except Exception as e:
-        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
-        return None
-
-sheet = connect_google_sheet("ai data")
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
@@ -79,93 +51,54 @@ for item in main_menu:
         st.session_state.redirect_done = False
         st.rerun()
 
-# ------------------- AI ASSISTANT OPTIONS -------------------
-# ------------------- AI ASSISTANT OPTIONS -------------------
+# ------------------- AI OPTIONS -------------------
 st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
-    # New Chat
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
-        st.session_state.ai_mode = "new"
-        st.session_state.current_topic = None
-        st.session_state.ai_history = []
-        st.session_state.page = "AI Assistant"
-        st.rerun()
-
-    # Guest Chat
-    if st.button("👤 Guest Chat", key="ai_guest", use_container_width=True):
-        st.session_state.ai_mode = "guest"
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
         st.rerun()
 
     # Load old chats for logged-in user
-    if st.session_state.logged_in and st.session_state.user and sheet:
+    if st.session_state.logged_in and st.session_state.user:
         if not st.session_state.user_chats:
-            try:
-                rows = sheet.get_all_records()
-                user_chats = {}
-                username = st.session_state.user.get("username", "")
-                for row in rows:
-                    if row.get("username") == username:
-                        topic = row.get("topic", "Untitled")
-                        if topic not in user_chats:
-                            user_chats[topic] = []
-                        user_chats[topic].append({
-                            "timestamp": row.get("timestamp", ""),
-                            "question": row.get("question", ""),
-                            "answer": row.get("answer", "")
-                        })
-                st.session_state.user_chats = user_chats
-            except Exception as e:
-                st.warning(f"⚠️ Failed to load chats: {e}")
+            from ai_assistant import connect_google_sheet
+            sheet = connect_google_sheet()
+            if sheet:
+                try:
+                    rows = sheet.get_all_records()
+                    user_chats = {}
+                    username = st.session_state.user.get("username", "")
+                    for row in rows:
+                        if row.get("username") == username:
+                            topic = row.get("topic", "Untitled")
+                            if topic not in user_chats:
+                                user_chats[topic] = []
+                            user_chats[topic].append({
+                                "timestamp": row.get("timestamp", ""),
+                                "question": row.get("question", ""),
+                                "answer": row.get("answer", "")
+                            })
+                    st.session_state.user_chats = user_chats
+                except:
+                    pass
 
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
-
             def set_old_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic_main
                 st.session_state.ai_history = st.session_state.user_chats.get(
                     st.session_state.current_topic, []
                 )
-                st.session_state.ai_mode = "old"
                 st.session_state.page = "AI Assistant"
                 st.rerun()
-
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
                 key="selected_old_topic_main",
                 on_change=set_old_topic
             )
-
-# ------------------- OPTIONAL: Agri News -------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("📰 Agri News")
-query = st.sidebar.text_input("Keyword", value="agriculture")
-
-@st.cache_data(ttl=600)
-def get_agri_news(q):
-    try:
-        api_key = st.secrets.get("NEWS_API_KEY", "")
-        if not api_key:
-            return []
-        url = f"https://newsapi.org/v2/everything?q={q}&language=en&pageSize=5&sortBy=publishedAt&apiKey={api_key}"
-        res = requests.get(url).json()
-        return res.get("articles", [])
-    except:
-        return []
-
-for n in get_agri_news(query):
-    st.sidebar.markdown(f"**[{n['title']}]({n['url']})**")
-    st.sidebar.caption(n["source"]["name"])
-    st.sidebar.markdown("---")
-
-# ------------------- AUTO-REDIRECT LOGIN → PROFILE -------------------
-if st.session_state.logged_in and st.session_state.page == "Login" and not st.session_state.redirect_done:
-    st.session_state.page = "Profile"
-    st.session_state.redirect_done = True
-    st.rerun()
 
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page

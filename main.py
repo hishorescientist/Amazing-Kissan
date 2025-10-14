@@ -14,6 +14,7 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
+footer {visibility: hidden;}
 [data-testid="stToolbarActions"] { visibility: hidden; }
 [data-testid="stSidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
