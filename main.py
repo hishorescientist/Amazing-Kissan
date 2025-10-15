@@ -7,7 +7,7 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 from storage import save_state, load_state
-from market1 import app as market_page
+from market import app as market_page
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
