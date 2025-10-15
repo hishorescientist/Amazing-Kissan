@@ -1,24 +1,6 @@
 import streamlit as st
 from datetime import datetime
-import streamlit as st
 
-def open_external(label, url, key=None):
-    js = f"window.open('{url}', '_blank');"
-    st.markdown(
-        f"""
-        <button onclick="{js}" style="
-            background-color:#2E8B57;
-            color:white;
-            padding:10px 20px;
-            border:none;
-            border-radius:8px;
-            cursor:pointer;
-            width:100%;
-            font-size:16px;
-        ">{label}</button>
-        """,
-        unsafe_allow_html=True
-    )
 def app():
     """Agricultural Market Integration Page"""
     st.title("🌾 Agricultural Marketplace Hub")
@@ -42,11 +24,20 @@ def app():
         st.image("https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg", width=120)
         st.markdown("**Amazon Agriculture Section**")
         st.write("Buy fertilizers, seeds, tools, and farm essentials directly from Amazon.")
-        open_external("Visit Amazon", "https://www.amazon.in/s?k=agriculture+products")
+        if st.button("Visit Amazon", key="amazon", use_container_width=True):
+            st.markdown(
+                "<meta http-equiv='refresh' content='0; url=https://www.amazon.in/s?k=agriculture+products'>",
+                unsafe_allow_html=True,
+            )
+
         st.image("https://upload.wikimedia.org/wikipedia/commons/1/1f/Flipkart_logo.png", width=120)
         st.markdown("**Flipkart Agri Store**")
         st.write("Explore a wide range of farming equipment and seeds at competitive prices.")
-        open_external("Visit Flipkart", "https://www.flipkart.com/search?q=agriculture+products")
+        if st.button("Visit Flipkart", key="flipkart", use_container_width=True):
+            st.markdown(
+                "<meta http-equiv='refresh' content='0; url=https://www.flipkart.com/search?q=agriculture+products'>",
+                unsafe_allow_html=True,
+            )
 
     with col2:
         st.image("https://upload.wikimedia.org/wikipedia/commons/b/bf/Bigbasket_logo.png", width=120)
@@ -61,7 +52,11 @@ def app():
         st.image("https://upload.wikimedia.org/wikipedia/en/4/4d/Agribazaar_logo.png", width=120)
         st.markdown("**AgriBazaar Official**")
         st.write("India’s top B2B marketplace for grains, pulses, and agri-commodities.")
-        open_external("Visit AgriBazaar", "https://www.agribazaar.com/")
+        if st.button("Visit AgriBazaar", key="agribazaar", use_container_width=True):
+            st.markdown(
+                "<meta http-equiv='refresh' content='0; url=https://www.agribazaar.com/'>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
     st.subheader("🌍 Featured Categories")
