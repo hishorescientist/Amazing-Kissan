@@ -178,7 +178,6 @@ def app():
 
     if user_input:
         st.session_state["pending_input"] = user_input
-        st.rerun()
 
     if "pending_input" in st.session_state:
         question = st.session_state.pop("pending_input")

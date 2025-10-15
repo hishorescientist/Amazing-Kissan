@@ -7,6 +7,7 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 from storage import save_state, load_state
+from market import app as market_page
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
@@ -59,11 +60,7 @@ if "state_loaded" not in st.session_state:
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home", "About", "AI Assistant", "Contact"]
-if st.session_state.logged_in:
-    main_menu.append("Profile")
-else:
-    main_menu.append("Login")
+main_menu = ["Home"]
 
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
@@ -72,7 +69,7 @@ for item in main_menu:
         st.rerun()
 
 # ------------------- AI OPTIONS -------------------
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.current_topic = None
@@ -118,6 +115,19 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 key="selected_old_topic_main",
                 on_change=set_old_topic
             )
+            
+
+main_menu = ["About", "Contact"]
+for item in main_menu:
+    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
+        st.session_state.page = item
+        st.session_state.redirect_done = False
+        st.rerun()
+if st.session_state.logged_in:
+    main_menu.append("Profile")
+else:
+    main_menu.append("Login")
+
 
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page
