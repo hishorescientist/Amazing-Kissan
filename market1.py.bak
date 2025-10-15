@@ -1,7 +1,6 @@
 import streamlit as st
 
 def app():
-    st.set_page_config(page_title="Agri Market", layout="centered")
     st.title("🌾 Amazing Kissan - Agri Market")
     st.write("Buy agriculture products directly from trusted marketplaces.")
 
