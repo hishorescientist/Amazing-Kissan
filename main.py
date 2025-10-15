@@ -60,7 +60,7 @@ if "state_loaded" not in st.session_state:
 
 # ------------------- SIDEBAR MENU -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home"]
+main_menu = ["Home", "Market"]
 
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
@@ -138,6 +138,8 @@ elif page == "About":
     about_page()
 elif page == "AI Assistant":
     ai_page()
+elif page == "Market":
+    market_page()
 elif page == "Contact":
     contact_page()
 elif page == "Login":
