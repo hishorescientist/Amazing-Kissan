@@ -17,7 +17,7 @@ def logout():
     
     st.session_state.logged_in = False
     st.session_state.page = "Login" 
-    st.rerun()
+    st.rerun(
 
 # ==============================================================================
 # 🤖 GEMINI API SIMULATION (Marketing Content Generation)
