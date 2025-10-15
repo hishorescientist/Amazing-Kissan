@@ -139,7 +139,7 @@ elif page == "About":
 elif page == "AI Assistant":
     ai_page()
 elif page == "Market":
-    market_page()
+    market_page(
 elif page == "Contact":
     contact_page()
 elif page == "Login":
