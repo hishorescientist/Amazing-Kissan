@@ -61,7 +61,11 @@ def app():
         st.image("https://upload.wikimedia.org/wikipedia/en/4/4d/Agribazaar_logo.png", width=120)
         st.markdown("**AgriBazaar Official**")
         st.write("India’s top B2B marketplace for grains, pulses, and agri-commodities.")
-        open_external("Visit AgriBazaar", "https://www.agribazaar.com/")
+        if st.button("Visit AgriBazaar", key="agribazaar", use_container_width=True):
+            st.markdown(
+                "<meta http-equiv='refresh' content='0; url=https://www.agribazaar.com/'>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
     st.subheader("🌍 Featured Categories")
