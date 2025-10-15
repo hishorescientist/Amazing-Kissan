@@ -69,7 +69,7 @@ for item in main_menu:
         st.rerun()
 
 # ------------------- AI OPTIONS -------------------
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.current_topic = None

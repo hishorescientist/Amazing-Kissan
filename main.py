@@ -118,15 +118,16 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             
 
 main_menu = ["About", "Contact"]
+if st.session_state.logged_in:
+    main_menu.append("Profile")
+else:
+    main_menu.append("Login")
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
         st.session_state.page = item
         st.session_state.redirect_done = False
         st.rerun()
-if st.session_state.logged_in:
-    main_menu.append("Profile")
-else:
-    main_menu.append("Login")
+
 
 
 # ------------------- PAGE ROUTING -------------------
