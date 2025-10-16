@@ -131,20 +131,20 @@ def app():
                         col1, col2, col3 = st.columns([1, 2, 2])
 
                         with col1:
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg_id}"):
+                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg_id}_{i}"):
                                 handle_like(msg["id"])
                                 st.rerun()
 
                         with col2:
-                            comment = st.text_input("💬 Comment", key=f"cbox_{msg_id}")
-                            if st.button("Post", key=f"post_{msg_id}"):
+                            comment = st.text_input("💬 Comment", key=f"cbox_{msg_id}_{i}")
+                            if st.button("Post", key=f"post_{msg_id}_{i}"):
                                 if comment.strip():
                                     add_comment(comment_sheet, msg["id"], user, comment.strip())
                                     st.success("✅ Comment added!")
                                     st.rerun()
 
                         with col3:
-                            if st.button("🔒 Private Reply", key=f"reply_{msg_id}"):
+                            if st.button("🔒 Private Reply", key=f"reply_{msg_id}_{i}"):
                                 st.session_state["page"] = "Messenger"
                                 st.session_state["private_target"] = msg["sender"]
                                 st.session_state["chat_type"] = "Private"
