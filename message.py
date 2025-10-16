@@ -99,7 +99,12 @@ def app():
     chat_type = st.session_state.get("chat_type", "Public")
     private_target = st.session_state.get("private_target", None)
 
-    chat_type = st.radio("Choose Chat Mode:", ["Public", "Private"], index=0 if chat_type=="Public" else 1, horizontal=True)
+    chat_type = st.radio(
+        "Choose Chat Mode:", 
+        ["Public", "Private"], 
+        index=0 if chat_type=="Public" else 1, 
+        horizontal=True
+    )
 
     receiver = None
     if chat_type == "Private":
@@ -112,16 +117,19 @@ def app():
 
     st.divider()
 
-    # Auto-refresh every 5 seconds
+    # Placeholder container for messages
     placeholder = st.empty()
+
+    # Auto-refresh every 5 seconds
     while True:
         with placeholder.container():
             # Load messages
             msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
             st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
 
-            for msg in msgs[-50:]:
+            for i, msg in enumerate(msgs[-50:]):
                 with st.container():
+                    # Display message
                     if msg["sender"] == user:
                         st.chat_message("user").markdown(f"**You:** {msg['message']}")
                     else:
@@ -130,24 +138,30 @@ def app():
 
                     if chat_type == "Public":
                         col1, col2, col3 = st.columns([1, 2, 2])
+                        # Like button
+                        like_key = f"like_{msg['id']}_{i}"
+                        if like_key not in st.session_state:
+                            st.session_state[like_key] = int(msg.get("likes", 0) or 0)
                         with col1:
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}"):
+                            if st.button(f"❤️ {st.session_state[like_key]}", key=like_key):
                                 update_likes(msg_sheet, msg["id"])
-                                st.rerun()
-                        with col2:
-                            comment_input_key = f"cbox_{msg['id']}"
-                            comment = st.text_input(f"💬 Comment", key=comment_input_key)
-                            if st.button("Post", key=f"post_{msg['id']}"):
-                                if comment.strip():
-                                    add_comment(comment_sheet, msg["id"], user, comment.strip())
-                                    st.success("✅ Comment added!")
-                                    st.rerun()
-                        with col3:
-                            if st.button("🔒 Private Reply", key=f"reply_{msg['id']}"):
-                                st.session_state["page"] = "Messenger"
-                                st.session_state["private_target"] = msg["sender"]
-                                st.session_state["chat_type"] = "Private"
-                                st.rerun()
+                                st.session_state[like_key] += 1
+
+                        # Comment input
+                        comment_input_key = f"cbox_{msg['id']}_{i}"
+                        comment = col2.text_input(f"💬 Comment", key=comment_input_key)
+                        post_key = f"post_{msg['id']}_{i}"
+                        if col2.button("Post", key=post_key):
+                            if comment.strip():
+                                add_comment(comment_sheet, msg["id"], user, comment.strip())
+                                st.success("✅ Comment added!")
+
+                        # Private reply
+                        reply_key = f"reply_{msg['id']}_{i}"
+                        if col3.button("🔒 Private Reply", key=reply_key):
+                            st.session_state["page"] = "Messenger"
+                            st.session_state["private_target"] = msg["sender"]
+                            st.session_state["chat_type"] = "Private"
 
                         # Display comments
                         comments = load_comments(comment_sheet, msg["id"])
@@ -160,6 +174,5 @@ def app():
             user_msg = st.chat_input("Type a message...")
             if user_msg:
                 send_message(msg_sheet, chat_type, user, user_msg, receiver)
-                st.rerun()
 
-        time.sleep(5)  # refresh every 5 seconds
+        time.sleep(5)
