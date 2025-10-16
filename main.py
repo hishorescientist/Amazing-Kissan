@@ -118,7 +118,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             )
             
 
-main_menu = ["About", "Contact"]
+main_menu = ["Message", "About", "Contact"]
 if st.session_state.logged_in:
     main_menu.append("Profile")
 else:
@@ -139,6 +139,8 @@ elif page == "About":
     about_page()
 elif page == "AI Assistant":
     ai_page()
+elif page == "Message":
+    message_page()
 elif page == "Contact":
     contact_page()
 elif page == "Login":
