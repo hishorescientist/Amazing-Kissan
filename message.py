@@ -52,7 +52,7 @@ def send_message(sheet, chat_type, sender, message, receiver=None):
     if not sheet or not message.strip():
         return
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg_id = f"{sender}_{int(datetime.now().timestamp())}"
+    msg_id = str(msg.get("id") or f"fallback_{msg['sender']}_{i}")
     try:
         # Note: Columns are: type, sender, receiver, message, time, likes, id
         sheet.append_row([chat_type.lower(), sender, receiver or "-", message, now, "0", msg_id])
