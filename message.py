@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 import time
+import uuid
 
 # ---------- GOOGLE SHEET CONFIG ----------
 SCOPE = [
@@ -136,8 +137,8 @@ def app():
                         # ❤️ Like Button
                         with col1:
                             like_key = f"like_{i}"  # unique per message
-                            if st.button(f"❤️ {msg['likes']}", key=like_key):
-                                handle_like(msg["id"])
+                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}_{uuid.uuid4()}"):
+                                handle_like(msg['id'])
                                 st.rerun()
 
                         # 💬 Comment Input + Post Button
