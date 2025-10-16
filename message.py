@@ -1,12 +1,11 @@
-from datetime import datetime
-import time
-import uuid
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh  # install via: pip install streamlit-autorefresh
+import uuid
+from streamlit_autorefresh import st_autorefresh  # pip install streamlit-autorefresh
 
 def app():
     st.title("💬 Messenger")
 
+    # --- Auth check ---
     if "user" not in st.session_state or not st.session_state.get("logged_in", False):
         st.warning("⚠️ Please log in first.")
         st.stop()
@@ -15,14 +14,14 @@ def app():
     msg_sheet = get_sheet("Messages")
     comment_sheet = get_sheet("Comments")
 
-    # Handle private reply navigation
+    # --- Chat mode selection ---
     chat_type = st.session_state.get("chat_type", "Public")
     private_target = st.session_state.get("private_target", None)
 
     chat_type = st.radio(
         "Choose Chat Mode:", 
         ["Public", "Private"], 
-        index=0 if chat_type=="Public" else 1, 
+        index=0 if chat_type == "Public" else 1,
         horizontal=True
     )
 
@@ -34,53 +33,55 @@ def app():
 
     st.divider()
 
-    # ⏱️ Auto-refresh every 5 seconds
+    # --- Auto refresh every 5 seconds ---
     st_autorefresh(interval=5000, key="chat_refresh")
 
-    # Load messages
+    # --- Load messages ---
     msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
     st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
 
+    # --- Display messages ---
     for i, msg in enumerate(msgs[-50:]):
+        msg_id = msg.get("id", f"msg_{i}")
         with st.container():
-            msg_key = f"{msg.get('id', uuid.uuid4())}_{i}"
-            if msg["sender"] == user:
-                st.chat_message("user", key=f"{msg_key}_user").markdown(f"**You:** {msg['message']}")
-            else:
-                st.chat_message("assistant", key=f"{msg_key}_assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
+            role = "user" if msg["sender"] == user else "assistant"
+            st.chat_message(role, key=f"msg_{msg_id}").markdown(
+                f"**{'You' if msg['sender']==user else msg['sender']}:** {msg['message']}"
+            )
             st.caption(msg["time"])
 
+            # --- Only for public chats ---
             if chat_type == "Public":
                 col1, col2, col3 = st.columns([1, 2, 2])
 
                 with col1:
-                    if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}"):
+                    if st.button(f"❤️ {msg['likes']}", key=f"like_{msg_id}"):
                         handle_like(msg["id"])
                         st.rerun()
 
                 with col2:
-                    comment_key = f"c_{msg['id']}"
-                    comment = st.text_input("💬 Comment", key=comment_key)
-                    if st.button("Post", key=f"post_{msg['id']}"):
+                    comment = st.text_input("💬 Comment", key=f"comment_{msg_id}")
+                    if st.button("Post", key=f"post_{msg_id}"):
                         if comment.strip():
                             add_comment(comment_sheet, msg["id"], user, comment.strip())
                             st.success("✅ Comment added!")
                             st.rerun()
 
                 with col3:
-                    if st.button("🔒 Private Reply", key=f"reply_{msg['id']}"):
+                    if st.button("🔒 Private Reply", key=f"reply_{msg_id}"):
                         st.session_state["page"] = "Messenger"
                         st.session_state["private_target"] = msg["sender"]
                         st.session_state["chat_type"] = "Private"
                         st.experimental_rerun()
 
+                # --- Show comments ---
                 comments = load_comments(comment_sheet, msg["id"])
                 for c in comments:
                     st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
 
             st.markdown("---")
 
-    # Input box for new message
+    # --- Chat input ---
     user_msg = st.chat_input("Type a message...")
     if user_msg:
         send_message(msg_sheet, chat_type, user, user_msg, receiver)
