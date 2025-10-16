@@ -7,6 +7,7 @@ from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
 from storage import save_state, load_state
+from message import app as message_page
 #from market import app as market_page
 
 # ------------------- PAGE CONFIG -------------------
@@ -117,7 +118,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
             )
             
 
-main_menu = ["About", "Contact"]
+main_menu = ["Message", "About", "Contact"]
 if st.session_state.logged_in:
     main_menu.append("Profile")
 else:
@@ -140,6 +141,8 @@ elif page == "AI Assistant":
     ai_page()
 elif page == "Contact":
     contact_page()
+elif page == "Message":
+    message_page()
 elif page == "Login":
     login_page()
 elif page == "Profile":
