@@ -1,9 +1,16 @@
+# 💬 Messenger Page
+# ----------------------------
+# Features:
+# - Public & Private chat modes
+# - Google Sheet-based message storage
+# - Like system with live updates
+# - Session-safe key handling
+
 import streamlit as st
 import gspread
 import json
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
-import time
 
 # ---------- GOOGLE SHEET CONFIG ----------
 SCOPE = [
@@ -13,166 +20,113 @@ SCOPE = [
 
 @st.cache_resource(show_spinner=False)
 def get_client():
+    """Authenticate and return Google Sheets client."""
     creds_json = st.secrets["google"]["creds"]
     creds_dict = json.loads(creds_json)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     return gspread.authorize(creds)
 
-def get_sheet(name):
-    try:
-        client = get_client()
-        return client.open("User").worksheet(name)
-    except Exception as e:
-        st.error(f"⚠️ Couldn't access sheet '{name}': {e}")
-        return None
+def get_message_sheet():
+    """Return messages worksheet."""
+    client = get_client()
+    sheet = client.open("amazing_kissan_data").worksheet("messages")
+    return sheet
 
-# ---------- MESSAGE FUNCTIONS ----------
-def load_messages(sheet, chat_type, sender, receiver=None):
-    try:
-        data = sheet.get_all_records()
-        if chat_type == "Public":
-            return [m for m in data if m["type"] == "public"]
-        else:
-            return [
-                m for m in data
-                if m["type"] == "private" and (
-                    (m["sender"] == sender and m["receiver"] == receiver)
-                    or (m["sender"] == receiver and m["receiver"] == sender)
-                )
-            ]
-    except Exception:
-        return []
-
-def send_message(sheet, chat_type, sender, message, receiver=None):
-    if not sheet or not message.strip():
-        return
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg_id = f"{sender}_{int(datetime.now().timestamp())}" if chat_type == "Public" else "-"
-    try:
-        sheet.append_row([chat_type.lower(), sender, receiver or "-", message, now, "0", msg_id])
-    except Exception as e:
-        st.error(f"❌ Could not send message: {e}")
+# ---------- MESSAGE OPERATIONS ----------
+def add_message(sheet, username, text, mode="Public"):
+    """Add a new message to the sheet."""
+    data = sheet.get_all_records()
+    next_id = len(data) + 1
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sheet.append_row([next_id, username, text, 0, timestamp, mode])
 
 def update_likes(sheet, msg_id):
-    try:
-        data = sheet.get_all_records()
-        for i, row in enumerate(data, start=2):
-            if str(row.get("id")) == str(msg_id):
-                current = row.get("likes")
-                try:
-                    current_likes = int(current or 0)
-                except ValueError:
-                    current_likes = 0
-                new_likes = current_likes + 1
-                sheet.update_cell(i, 6, str(new_likes))
-                return
-    except Exception as e:
-        st.error(f"⚠️ Could not update likes: {e}")
+    """Increment likes in the Google Sheet."""
+    data = sheet.get_all_records()
+    for i, msg in enumerate(data, start=2):  # Start=2 to skip header row
+        if str(msg.get("id")) == str(msg_id):
+            current_likes = int(msg.get("likes", 0) or 0)
+            sheet.update_cell(i, 4, current_likes + 1)
+            break
 
-# ---------- COMMENTS ----------
-def load_comments(sheet, msg_id):
-    try:
-        return [c for c in sheet.get_all_records() if c["message_id"] == msg_id]
-    except Exception:
-        return []
+# ---------- SAFE LIKE HANDLER ----------
+def safe_like_update(sheet, msg_id, like_key):
+    """Safely updates like count without duplicate keys."""
+    if like_key not in st.session_state or not isinstance(st.session_state[like_key], int):
+        st.session_state[like_key] = 0
+    st.session_state[like_key] += 1
+    update_likes(sheet, msg_id)
+    st.rerun()
 
-def add_comment(sheet, msg_id, commenter, comment):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        sheet.append_row([msg_id, commenter, comment, now])
-    except Exception as e:
-        st.error(f"⚠️ Could not add comment: {e}")
-
-# ---------- MAIN APP ----------
+# ---------- MAIN PAGE ----------
 def app():
+    st.set_page_config(page_title="Messenger", page_icon="💬", layout="centered")
     st.title("💬 Messenger")
+    st.caption("Chat publicly or privately — powered by Google Sheets")
 
-    if "user" not in st.session_state or not st.session_state.get("logged_in", False):
-        st.warning("⚠️ Please log in first.")
-        st.stop()
+    # ----- Select chat mode -----
+    mode = st.radio("Choose Chat Mode:", ["🌍 Public", "🔒 Private"], horizontal=True)
 
-    user = st.session_state.user.get("username")
-    msg_sheet = get_sheet("Messages")
-    comment_sheet = get_sheet("Comments")
+    msg_sheet = get_message_sheet()
+    all_messages = msg_sheet.get_all_records()
 
-    # Handle private reply navigation
-    chat_type = st.session_state.get("chat_type", "Public")
-    private_target = st.session_state.get("private_target", None)
+    # ----- Input box -----
+    st.divider()
+    st.subheader("📨 Send a Message")
 
-    chat_type = st.radio(
-        "Choose Chat Mode:", 
-        ["Public", "Private"], 
-        index=0 if chat_type=="Public" else 1, 
-        horizontal=True
-    )
+    username = st.text_input("Your Name:", key="username_input")
+    message_text = st.text_area("Type your message:", key="msg_input", height=100)
 
-    receiver = None
-    if chat_type == "Private":
-        users = get_sheet("Sheet1").get_all_records()
-        names = [u["username"] for u in users if u["username"] != user]
-        if private_target and private_target in names:
-            receiver = private_target
+    if st.button("Send", use_container_width=True, key="send_btn"):
+        if username.strip() and message_text.strip():
+            add_message(msg_sheet, username.strip(), message_text.strip(), mode.replace("🌍 ", "").replace("🔒 ", ""))
+            st.success("✅ Message sent!")
+            st.rerun()
         else:
-            receiver = st.selectbox("Chat with:", names)
+            st.warning("⚠️ Please enter both name and message.")
 
     st.divider()
 
-    # Placeholder container for messages
-    placeholder = st.empty()
+    # ----- Message feed -----
+    st.subheader("🗨️ Message Feed")
 
-    # Auto-refresh every 5 seconds
-    while True:
-        with placeholder.container():
-            # Load messages
-            msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
-            st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
+    # Filter messages by mode
+    if "Public" in mode:
+        messages = [m for m in all_messages if m.get("mode", "Public") == "Public"]
+    else:
+        messages = [m for m in all_messages if m.get("mode", "Public") == "Private"]
 
-            for i, msg in enumerate(msgs[-50:]):
-                with st.container():
-                    # Display message
-                    if msg["sender"] == user:
-                        st.chat_message("user").markdown(f"**You:** {msg['message']}")
-                    else:
-                        st.chat_message("assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
-                    st.caption(msg["time"])
+    if not messages:
+        st.info("No messages yet. Start the conversation!")
+        return
 
-                    if chat_type == "Public":
-                        col1, col2, col3 = st.columns([1, 2, 2])
-                        # Like button
-                        like_key = f"like_{msg['id']}_{i}"
-                        if like_key not in st.session_state:
-                            st.session_state[like_key] = int(msg.get("likes", 0) or 0)
-                        with col1:
-                            if st.button(f"❤️ {st.session_state[like_key]}", key=like_key):
-                                update_likes(msg_sheet, msg["id"])
-                                st.session_state[like_key] += 1
+    for i, msg in enumerate(reversed(messages), start=1):
+        user = msg.get("username", "Unknown")
+        text = msg.get("message", "")
+        likes = int(msg.get("likes", 0) or 0)
+        timestamp = msg.get("timestamp", "—")
+        msg_id = msg.get("id", i)
 
-                        # Comment input
-                        comment_input_key = f"cbox_{msg['id']}_{i}"
-                        comment = col2.text_input(f"💬 Comment", key=comment_input_key)
-                        post_key = f"post_{msg['id']}_{i}"
-                        if col2.button("Post", key=post_key):
-                            if comment.strip():
-                                add_comment(comment_sheet, msg["id"], user, comment.strip())
-                                st.success("✅ Comment added!")
+        with st.container():
+            st.markdown(
+                f"**{user}** says:  \n> {text}  \n"
+                f"<small>🕒 {timestamp}</small>",
+                unsafe_allow_html=True
+            )
 
-                        # Private reply
-                        reply_key = f"reply_{msg['id']}_{i}"
-                        if col3.button("🔒 Private Reply", key=reply_key):
-                            st.session_state["page"] = "Messenger"
-                            st.session_state["private_target"] = msg["sender"]
-                            st.session_state["chat_type"] = "Private"
+            col1, col2 = st.columns([1, 9])
+            like_key = f"like_{msg_id}_{i}"
 
-                        # Display comments
-                        comments = load_comments(comment_sheet, msg["id"])
-                        for c in comments:
-                            st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
+            # Initialize like count in session safely
+            if like_key not in st.session_state or not isinstance(st.session_state[like_key], int):
+                st.session_state[like_key] = likes
 
-                    st.markdown("---")
+            with col1:
+                if st.button(f"❤️ {st.session_state[like_key]}", key=f"btn_{like_key}"):
+                    safe_like_update(msg_sheet, msg_id, like_key)
 
-            # Input box for new messages
-            user_msg = st.chat_input("Type a message...")
-            if user_msg:
-                send_message(msg_sheet, chat_type, user, user_msg, receiver)
+            st.markdown("---")
 
-        time.sleep(5)
+# ---------- RUN PAGE ----------
+if __name__ == "__main__":
+    app()
