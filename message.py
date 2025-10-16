@@ -1,87 +1,9 @@
-import streamlit as st
-import gspread
-import json
 from datetime import datetime
-from oauth2client.service_account import ServiceAccountCredentials
 import time
 import uuid
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh  # install via: pip install streamlit-autorefresh
 
-# ---------- GOOGLE SHEET CONFIG ----------
-SCOPE = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
-
-@st.cache_resource(show_spinner=False)
-def get_client():
-    creds_json = st.secrets["google"]["creds"]
-    creds_dict = json.loads(creds_json)
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-    return gspread.authorize(creds)
-
-def get_sheet(name):
-    try:
-        client = get_client()
-        return client.open("User").worksheet(name)
-    except Exception as e:
-        st.error(f"⚠️ Couldn't access sheet '{name}': {e}")
-        return None
-
-# ---------- MESSAGE FUNCTIONS ----------
-def load_messages(sheet, chat_type, sender, receiver=None):
-    try:
-        data = sheet.get_all_records()
-        if chat_type == "Public":
-            return [m for m in data if m["type"] == "public"]
-        else:
-            return [
-                m for m in data
-                if m["type"] == "private" and (
-                    (m["sender"] == sender and m["receiver"] == receiver)
-                    or (m["sender"] == receiver and m["receiver"] == sender)
-                )
-            ]
-    except Exception:
-        return []
-
-def send_message(sheet, chat_type, sender, message, receiver=None):
-    if not sheet or not message.strip():
-        return
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg_id = f"{sender}_{int(datetime.now().timestamp())}" if chat_type == "Public" else "-"
-    try:
-        sheet.append_row([chat_type.lower(), sender, receiver or "-", message, now, "0", msg_id])
-    except Exception as e:
-        st.error(f"❌ Could not send message: {e}")
-
-def handle_like(msg_id):
-    msg_sheet = get_sheet("Messages")
-    if msg_sheet:
-        try:
-            data = msg_sheet.get_all_records()
-            for i, row in enumerate(data, start=2):
-                if str(row.get("id")) == str(msg_id):
-                    current_likes = int(row.get("likes") or 0)
-                    msg_sheet.update_cell(i, 6, str(current_likes + 1))
-                    return
-        except Exception as e:
-            st.error(f"⚠️ Could not update likes: {e}")
-
-# ---------- COMMENTS ----------
-def load_comments(sheet, msg_id):
-    try:
-        return [c for c in sheet.get_all_records() if c["message_id"] == msg_id]
-    except Exception:
-        return []
-
-def add_comment(sheet, msg_id, commenter, comment):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        sheet.append_row([msg_id, commenter, comment, now])
-    except Exception as e:
-        st.error(f"⚠️ Could not add comment: {e}")
-
-# ---------- MAIN APP ----------
 def app():
     st.title("💬 Messenger")
 
@@ -108,75 +30,58 @@ def app():
     if chat_type == "Private":
         users = get_sheet("Sheet1").get_all_records()
         names = [u["username"] for u in users if u["username"] != user]
-        if private_target and private_target in names:
-            receiver = private_target
-        else:
-            receiver = st.selectbox("Chat with:", names)
+        receiver = private_target if private_target in names else st.selectbox("Chat with:", names)
 
     st.divider()
 
-    # Auto-refresh every 5 seconds
-    placeholder = st.empty()
-    while True:
-        with placeholder.container():
-            # Load messages
-            msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
-            st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
+    # ⏱️ Auto-refresh every 5 seconds
+    st_autorefresh(interval=5000, key="chat_refresh")
 
-            for i, msg in enumerate(msgs[-50:]):  # enumerate ensures unique index
-                with st.container():
-                    # Chat message display
-                    msg_key = f"{msg.get('id', uuid.uuid4())}_{i}"
-                    if msg["sender"] == user:
-                        st.chat_message("user", key=f"{msg_key}_user").markdown(f"**You:** {msg['message']}")
-                    else:
-                        st.chat_message("assistant", key=f"{msg_key}_assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
-                    st.caption(msg["time"])
+    # Load messages
+    msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
+    st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
 
-                    # PUBLIC chat section
-                    if chat_type == "Public":
-                        col1, col2, col3 = st.columns([1, 2, 2])
+    for i, msg in enumerate(msgs[-50:]):
+        with st.container():
+            msg_key = f"{msg.get('id', uuid.uuid4())}_{i}"
+            if msg["sender"] == user:
+                st.chat_message("user", key=f"{msg_key}_user").markdown(f"**You:** {msg['message']}")
+            else:
+                st.chat_message("assistant", key=f"{msg_key}_assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
+            st.caption(msg["time"])
 
-                        # ❤️ Like Button
-                        with col1:
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{uuid.uuid4()}"):
-                                handle_like(msg["id"])
-                                st.rerun()
+            if chat_type == "Public":
+                col1, col2, col3 = st.columns([1, 2, 2])
 
-                        # 💬 Comment Input + Post Button
-                        with col2:
-                            comment_input_key = f"cbox_{uuid.uuid4()}"
-                            comment_post_key = f"post_{uuid.uuid4()}"
+                with col1:
+                    if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}"):
+                        handle_like(msg["id"])
+                        st.rerun()
 
-                            comment = st.text_input("💬 Comment", key=comment_input_key)
-                            if st.button("Post", key=comment_post_key):
-                                if comment.strip():
-                                    add_comment(comment_sheet, msg["id"], user, comment.strip())
-                                    st.success("✅ Comment added!")
-                                    st.rerun()
+                with col2:
+                    comment_key = f"c_{msg['id']}"
+                    comment = st.text_input("💬 Comment", key=comment_key)
+                    if st.button("Post", key=f"post_{msg['id']}"):
+                        if comment.strip():
+                            add_comment(comment_sheet, msg["id"], user, comment.strip())
+                            st.success("✅ Comment added!")
+                            st.rerun()
 
-                        # 🔒 Private Reply
-                        with col3:
-                            if st.button("🔒 Private Reply", key=f"reply_{uuid.uuid4()}"):
-                                st.session_state["page"] = "Messenger"
-                                st.session_state["private_target"] = msg["sender"]
-                                st.session_state["chat_type"] = "Private"
-                                st.experimental_rerun()
+                with col3:
+                    if st.button("🔒 Private Reply", key=f"reply_{msg['id']}"):
+                        st.session_state["page"] = "Messenger"
+                        st.session_state["private_target"] = msg["sender"]
+                        st.session_state["chat_type"] = "Private"
+                        st.experimental_rerun()
 
-                        # Display comments
-                        comments = load_comments(comment_sheet, msg["id"])
-                        for c in comments:
-                            st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
+                comments = load_comments(comment_sheet, msg["id"])
+                for c in comments:
+                    st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
 
-                    st.markdown("---")
+            st.markdown("---")
 
-            # Input box for new messages (unique key)
-            user_msg_key = f"chat_input_{uuid.uuid4()}"
-            user_msg = st.chat_input("Type a message...", key=user_msg_key)
-            if user_msg:
-                send_message(msg_sheet, chat_type, user, user_msg, receiver)
-                st.rerun()
-
-        time.sleep(5)  # refresh every 5 seconds
-       
-       
+    # Input box for new message
+    user_msg = st.chat_input("Type a message...")
+    if user_msg:
+        send_message(msg_sheet, chat_type, user, user_msg, receiver)
+        st.rerun()
