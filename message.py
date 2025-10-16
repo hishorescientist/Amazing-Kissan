@@ -120,30 +120,42 @@ def app():
             msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
             st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
 
-            for msg in msgs[-50:]:
+            for i, msg in enumerate(msgs[-50:]):  # use enumerate for unique index
                 with st.container():
+                    # Chat message display
                     if msg["sender"] == user:
                         st.chat_message("user").markdown(f"**You:** {msg['message']}")
                     else:
                         st.chat_message("assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
                     st.caption(msg["time"])
 
+                    # PUBLIC chat section
                     if chat_type == "Public":
                         col1, col2, col3 = st.columns([1, 2, 2])
+
+                        # ❤️ Like Button
                         with col1:
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['user']}_{msg['id']}"):
-                                handle_like(msg['id'])
+                            like_key = f"like_{i}"  # unique per message
+                            if st.button(f"❤️ {msg['likes']}", key=like_key):
+                                handle_like(msg["id"])
                                 st.rerun()
+
+                        # 💬 Comment Input + Post Button
                         with col2:
-                            comment_input_key = f"cbox_{msg['id']}"
-                            comment = st.text_input(f"💬 Comment", key=comment_input_key)
-                            if st.button("Post", key=f"post_{msg['id']}"):
+                            comment_input_key = f"cbox_{i}"
+                            comment_post_key = f"post_{i}"
+
+                            comment = st.text_input("💬 Comment", key=comment_input_key)
+                            if st.button("Post", key=comment_post_key):
                                 if comment.strip():
                                     add_comment(comment_sheet, msg["id"], user, comment.strip())
                                     st.success("✅ Comment added!")
                                     st.rerun()
+
+                        # 🔒 Private Reply
                         with col3:
-                            if st.button("🔒 Private Reply", key=f"reply_{msg['id']}"):
+                            reply_key = f"reply_{i}"
+                            if st.button("🔒 Private Reply", key=reply_key):
                                 st.session_state["page"] = "Messenger"
                                 st.session_state["private_target"] = msg["sender"]
                                 st.session_state["chat_type"] = "Private"
@@ -155,7 +167,6 @@ def app():
                             st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
 
                     st.markdown("---")
-
             # Input box for new messages
             user_msg = st.chat_input("Type a message...")
             if user_msg:
