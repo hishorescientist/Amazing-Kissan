@@ -131,8 +131,8 @@ def app():
                     if chat_type == "Public":
                         col1, col2, col3 = st.columns([1, 2, 2])
                         with col1:
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}"):
-                                update_likes(msg_sheet, msg["id"])
+                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['user']}_{msg['id']}"):
+                                handle_like(msg['id'])
                                 st.rerun()
                         with col2:
                             comment_input_key = f"cbox_{msg['id']}"
