@@ -54,21 +54,18 @@ def send_message(sheet, chat_type, sender, message, receiver=None):
     except Exception as e:
         st.error(f"❌ Could not send message: {e}")
 
-def update_likes(sheet, msg_id):
-    try:
-        data = sheet.get_all_records()
-        for i, row in enumerate(data, start=2):
-            if str(row.get("id")) == str(msg_id):
-                current = row.get("likes")
-                try:
-                    current_likes = int(current or 0)
-                except ValueError:
-                    current_likes = 0
-                new_likes = current_likes + 1
-                sheet.update_cell(i, 6, str(new_likes))
-                return
-    except Exception as e:
-        st.error(f"⚠️ Could not update likes: {e}")
+def handle_like(msg_id):
+    msg_sheet = get_sheet("Messages")
+    if msg_sheet:
+        try:
+            data = msg_sheet.get_all_records()
+            for i, row in enumerate(data, start=2):
+                if str(row.get("id")) == str(msg_id):
+                    current_likes = int(row.get("likes") or 0)
+                    msg_sheet.update_cell(i, 6, str(current_likes + 1))
+                    return
+        except Exception as e:
+            st.error(f"⚠️ Could not update likes: {e}")
 
 # ---------- COMMENTS ----------
 def load_comments(sheet, msg_id):
@@ -100,7 +97,12 @@ def app():
     chat_type = st.session_state.get("chat_type", "Public")
     private_target = st.session_state.get("private_target", None)
 
-    chat_type = st.radio("Choose Chat Mode:", ["Public", "Private"], index=0 if chat_type=="Public" else 1, horizontal=True)
+    chat_type = st.radio(
+        "Choose Chat Mode:", 
+        ["Public", "Private"], 
+        index=0 if chat_type=="Public" else 1, 
+        horizontal=True
+    )
 
     receiver = None
     if chat_type == "Private":
@@ -113,38 +115,38 @@ def app():
 
     st.divider()
 
-    # Auto-refresh every 5 seconds
+    # Placeholder for live messages
     placeholder = st.empty()
+
     while True:
         with placeholder.container():
             # Load messages
             msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
             st.subheader("🌍 Public Feed" if chat_type == "Public" else f"🔒 Chat with {receiver}")
 
-            for i, msg in enumerate(msgs[-50:]):  # use enumerate for unique index
+            for i, msg in enumerate(msgs[-50:]):
                 with st.container():
-                    # Chat message display
+                    # Display chat message (no key for chat_message)
                     if msg["sender"] == user:
                         st.chat_message("user").markdown(f"**You:** {msg['message']}")
                     else:
                         st.chat_message("assistant").markdown(f"**{msg['sender']}:** {msg['message']}")
                     st.caption(msg["time"])
 
-                    # PUBLIC chat section
                     if chat_type == "Public":
-                        col1, col2, col3 = st.columns([1, 2, 2])
+                        col1, col2, col3 = st.columns([1,2,2])
 
                         # ❤️ Like Button
                         with col1:
-                            like_key = f"like_{i}"  # unique per message
-                            if st.button(f"❤️ {msg['likes']}", key=f"like_{msg['id']}_{uuid.uuid4()}"):
-                                handle_like(msg['id'])
+                            like_key = f"like_{uuid.uuid4()}"
+                            if st.button(f"❤️ {msg['likes']}", key=like_key):
+                                handle_like(msg["id"])
                                 st.rerun()
 
                         # 💬 Comment Input + Post Button
                         with col2:
-                            comment_input_key = f"cbox_{i}"
-                            comment_post_key = f"post_{i}"
+                            comment_input_key = f"cbox_{uuid.uuid4()}"
+                            comment_post_key = f"post_{uuid.uuid4()}"
 
                             comment = st.text_input("💬 Comment", key=comment_input_key)
                             if st.button("Post", key=comment_post_key):
@@ -155,7 +157,7 @@ def app():
 
                         # 🔒 Private Reply
                         with col3:
-                            reply_key = f"reply_{i}"
+                            reply_key = f"reply_{uuid.uuid4()}"
                             if st.button("🔒 Private Reply", key=reply_key):
                                 st.session_state["page"] = "Messenger"
                                 st.session_state["private_target"] = msg["sender"]
@@ -168,10 +170,12 @@ def app():
                             st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
 
                     st.markdown("---")
-            # Input box for new messages
-            user_msg = st.chat_input("Type a message...")
+
+            # Chat input for new messages (unique key)
+            chat_input_key = f"chat_input_{uuid.uuid4()}"
+            user_msg = st.chat_input("Type a message...", key=chat_input_key)
             if user_msg:
                 send_message(msg_sheet, chat_type, user, user_msg, receiver)
                 st.rerun()
 
-        time.sleep(5)  # refresh every 5 seconds
+        time.sleep(5)
