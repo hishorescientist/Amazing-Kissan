@@ -1,211 +1,188 @@
 import streamlit as st
-import gspread
-import json
+import json, uuid, gspread
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
-import time
+from comments import add_comment_gsheet, load_comments_gsheet
 
-# ---------- GOOGLE SHEET CONFIG ----------
+# ---------- GOOGLE CONFIG ----------
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-@st.cache_resource(show_spinner=False)
-def get_client():
-    """Initializes and authorizes the gspread client."""
-    creds_json = st.secrets["google"]["creds"]
-    creds_dict = json.loads(creds_json)
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-    return gspread.authorize(creds)
 
-def get_sheet(name):
-    """Opens a specific worksheet."""
+# ---------- CONNECT ----------
+@st.cache_resource(show_spinner=False)
+def connect_message_sheet():
+    """Connect to Google Sheet for messages."""
     try:
-        client = get_client()
-        # NOTE: Assumes the spreadsheet is named "User"
-        return client.open("User").worksheet(name)
+        creds_json = st.secrets["google"]["creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet("Sheet3")
     except Exception as e:
-        st.error(f"⚠️ Couldn't access sheet '{name}': {e}")
+        st.warning(f"⚠️ Could not connect to Message Sheet: {e}")
         return None
 
-# ---------- MESSAGE FUNCTIONS ----------
-def load_messages(sheet, chat_type, sender, receiver=None):
-    """Loads public or private messages from the sheet."""
+
+# ---------- LOAD MESSAGES ----------
+def load_messages_gsheet():
     try:
+        sheet = connect_message_sheet()
+        if not sheet:
+            return []
         data = sheet.get_all_records()
-        if chat_type == "Public":
-            return [m for m in data if m["type"] == "public"]
-        else:
-            return [
-                m for m in data
-                if m["type"] == "private" and (
-                    (m["sender"] == sender and m["receiver"] == receiver)
-                    or (m["sender"] == receiver and m["receiver"] == sender)
-                )
-            ]
-    except Exception:
+        return data
+    except Exception as e:
+        st.error(f"❌ Error loading messages: {e}")
         return []
 
-def send_message(sheet, chat_type, sender, message, receiver=None):
-    """Appends a new message row to the sheet."""
-    if not sheet or not message.strip():
-        return
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg_id = str(msg.get("id") or f"fallback_{msg['sender']}_{i}")
+
+# ---------- ADD MESSAGE ----------
+def add_message_gsheet(username, text):
     try:
-        # Note: Columns are: type, sender, receiver, message, time, likes, id
-        sheet.append_row([chat_type.lower(), sender, receiver or "-", message, now, "0", msg_id])
+        sheet = connect_message_sheet()
+        if not sheet:
+            st.error("❌ Message sheet not found.")
+            return
+        new_row = [
+            str(uuid.uuid4()),
+            username,
+            text,
+            0,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
+        sheet.append_row(new_row)
     except Exception as e:
         st.error(f"❌ Could not send message: {e}")
 
-def handle_like(msg_id):
-    """Increments the like count for a specific message ID."""
-    msg_sheet = get_sheet("Messages")
-    if msg_sheet:
-        try:
-            data = msg_sheet.get_all_records()
-            # Iterate through data to find the row index (gspread is 1-indexed, and rows start after header)
-            for i, row in enumerate(data, start=2): 
-                if str(row.get("id")) == str(msg_id):
-                    # Column 6 is 'likes'
-                    current_likes = int(row.get("likes") or 0)
-                    msg_sheet.update_cell(i, 6, str(current_likes + 1))
-                    return
-        except Exception as e:
-            st.error(f"⚠️ Could not update likes: {e}")
 
-# ---------- COMMENTS ----------
-def load_comments(sheet, msg_id):
-    """Loads comments for a specific message."""
+# ---------- UPDATE LIKES ----------
+def update_likes_gsheet(msg_id):
     try:
-        # Note: Assumes Comments sheet columns are: message_id, commenter, comment, time
-        return [c for c in sheet.get_all_records() if c["message_id"] == msg_id]
-    except Exception:
-        return []
-
-def add_comment(sheet, msg_id, commenter, comment):
-    """Adds a new comment row to the sheet."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        sheet.append_row([msg_id, commenter, comment, now])
+        sheet = connect_message_sheet()
+        if not sheet:
+            return
+        data = sheet.get_all_records()
+        for i, row in enumerate(data, start=2):  # start=2 skips header
+            if str(row["id"]) == str(msg_id):
+                new_likes = int(row["likes"]) + 1
+                sheet.update_cell(i, 4, new_likes)
+                break
     except Exception as e:
-        st.error(f"⚠️ Could not add comment: {e}")
+        st.error(f"❌ Could not update likes: {e}")
 
-# ---------- MAIN APP ----------
+
+# ---------- PAGE ----------
 def app():
     st.title("💬 Messenger")
 
-    if "user" not in st.session_state or not st.session_state.get("logged_in", False):
+    # ✅ Check login
+    if not st.session_state.get("logged_in") or not st.session_state.get("user"):
         st.warning("⚠️ Please log in first.")
         st.stop()
 
-    user = st.session_state.user.get("username")
-    msg_sheet = get_sheet("Messages")
-    comment_sheet = get_sheet("Comments")
+    username = st.session_state.user.get("username", "Anonymous")
 
-    # Initialize chat state
-    if "chat_type" not in st.session_state:
-        st.session_state["chat_type"] = "Public"
-    if "private_target" not in st.session_state:
-        st.session_state["private_target"] = None
+    # ---------- Floating Button CSS ----------
+    st.markdown("""
+    <style>
+    .floating-btn {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 9999;
+    }
+    .floating-btn button {
+        background-color: #FF5733;
+        color: white;
+        border: none;
+        padding: 14px 22px;
+        border-radius: 50px;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    }
+    .floating-btn button:hover {
+        background-color: #e64523;
+    }
+    </style>
+    <div class="floating-btn">
+        <form action="#" method="get">
+            <button name="show_post" value="1">✏️ New Message</button>
+        </form>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Handle chat type selection
-    chat_type = st.radio(
-        "Choose Chat Mode:",
-        ["Public", "Private"],
-        index=0 if st.session_state.chat_type == "Public" else 1,
-        horizontal=True
-    )
-    st.session_state["chat_type"] = chat_type # Update session state
+    # ---------- Toggle Post Box ----------
+    if "show_post_box" not in st.session_state:
+        st.session_state.show_post_box = False
 
-    receiver = None
-    if chat_type == "Private":
-        # Note: Assumes user list is in "Sheet1" and has a "username" column
-        users = get_sheet("Sheet1").get_all_records()
-        names = [u["username"] for u in users if u["username"] != user]
-        
-        # Determine current selection index
-        current_target = st.session_state.private_target if st.session_state.private_target in names else (names[0] if names else None)
-        
-        if names:
-            receiver = st.selectbox("Chat with:", names, index=names.index(current_target))
-            st.session_state["private_target"] = receiver
-        else:
-            st.warning("No other users found to chat with.")
-            receiver = None
+    if st.query_params.get("show_post") == ["1"]:
+        st.session_state.show_post_box = True
+        st.experimental_set_query_params()  # clear param
+
+    # ---------- Post Box ----------
+    if st.session_state.show_post_box:
+        with st.form("post_form", clear_on_submit=True):
+            text = st.text_area(f"💭 Message as **{username}**", key="msg_input", height=100)
+            submitted = st.form_submit_button("📨 Send")
+            if submitted:
+                if text.strip():
+                    add_message_gsheet(username, text)
+                    st.success("✅ Message sent!")
+                    st.session_state.show_post_box = False
+                    st.rerun()
+                else:
+                    st.warning("Please type something before sending.")
 
     st.divider()
 
-    # Auto-refresh loop: Note: This is a blocking pattern in Streamlit and will cause a 5s delay on ALL interactions.
-    # It is kept here as it was part of the original requirement for auto-refresh.
-    placeholder = st.empty()
-    while True:
-        with placeholder.container():
-            # Load and display messages
-            msgs = load_messages(msg_sheet, chat_type, sender=user, receiver=receiver)
-            
-            # Show the most recent 50 messages
-            st.subheader("🌍 Public Feed" if chat_type == "Public" and msg_sheet else f"🔒 Chat with {receiver}")
+    # ---------- Show Messages ----------
+    messages = load_messages_gsheet()
+    if not messages:
+        st.info("No messages yet.")
+        return
 
-            if not msg_sheet:
-                 st.error("Cannot display messages without a valid 'Messages' sheet connection.")
-            elif chat_type == "Private" and not receiver:
-                 st.info("Select a user to start a private chat.")
+    for msg in reversed(messages):  # newest first
+        msg_id = msg.get("id")
+        user_msg = msg.get("user")
+        text_msg = msg.get("text", "")
+        likes_msg = msg.get("likes", 0)
+        time_msg = msg.get("time", "")
+
+        if not msg_id or not text_msg:
+            continue  # skip invalid rows
+
+        st.markdown(f"**👤 {user_msg}:** {text_msg}")
+        st.caption(f"🕒 {time_msg}")
+
+        # ❤️ Like button
+        if st.button(f"❤️ {likes_msg}", key=f"like_{msg_id}"):
+            update_likes_gsheet(msg_id)
+            st.rerun()
+
+        # 💬 Comments Expander
+        with st.expander("💬 Comments", expanded=False):
+            comments = load_comments_gsheet(msg_id)
+            if comments:
+                for c in comments:
+                    st.markdown(f"**{c.get('user')}:** {c.get('text','')}")
+                    st.caption(f"🕓 {c.get('time','')}")
             else:
-                for i, msg in enumerate(msgs[-50:]):
-                    with st.container():
-                        # --- CRITICAL FIX: Generate a stable, unique key using only the message ID ---
-                        # The msg ID is unique and stable (sender_timestamp).
-                        # The index 'i' (of the 50 displayed messages) is volatile and caused the key error.
-                        msg_id = str(msg.get("id", f"fallback_{msg['sender']}_{i}")) 
-                        # --------------------------------------------------------------------------
-                        
-                        sender_name = "You" if msg["sender"] == user else msg["sender"]
+                st.caption("No comments yet.")
 
-                        st.chat_message("user" if msg["sender"] == user else "assistant").markdown(
-                            f"**{sender_name}:** {msg['message']}"
-                        )
-                        st.caption(msg["time"])
+        # Add Comment
+            with st.form(f"comment_form_{msg_id}", clear_on_submit=True):
+                comment_text = st.text_area("Reply...", key=f"comment_input_{msg_id}", height=50)
+                comment_submitted = st.form_submit_button("Reply")
+                if comment_submitted:
+                    if comment_text.strip():
+                        add_comment_gsheet(msg_id, username, comment_text.strip())
+                        st.success("✅ Comment added!")
+                        st.rerun()
+                    else:
+                        st.warning("Please type a comment before submitting.")
 
-                        if chat_type == "Public":
-                            col1, col2, col3 = st.columns([1, 2, 2])
-
-                            with col1:
-                                # Key uses only msg_id
-                                if st.button(f"❤️ {msg.get('likes', 0)}", key=f"like_{msg_id}"):
-                                    handle_like(msg["id"])
-                                    st.rerun()
-
-                            with col2:
-                                # Key uses only msg_id
-                                comment = st.text_input("💬 Comment", key=f"cbox_{msg_id}")
-                                # Key uses only msg_id (added _btn suffix to avoid clash with text input)
-                                if st.button("Post", key=f"post_{msg_id}_btn"): 
-                                    if comment.strip():
-                                        add_comment(comment_sheet, msg["id"], user, comment.strip())
-                                        st.success("✅ Comment added!")
-                                        st.rerun()
-
-                            with col3:
-                                # Key uses only msg_id
-                                if st.button("🔒 Private Reply", key=f"reply_{msg_id}"):
-                                    st.session_state["chat_type"] = "Private"
-                                    st.session_state["private_target"] = msg["sender"]
-                                    st.rerun() # Use st.rerun()
-
-                            # Display comments
-                            comments = load_comments(comment_sheet, msg["id"])
-                            for c in comments:
-                                st.markdown(f"  💭 *{c['commenter']}*: {c['comment']}  _({c['time']})_")
-
-                        st.markdown("---")
-
-            # Message Input
-            user_msg = st.chat_input("Type a message...")
-            if user_msg:
-                send_message(msg_sheet, chat_type, user, user_msg, receiver)
-                st.rerun()
-
-        # The blocking refresh mechanism from the original code
-        time.sleep(5)
+        st.divider()
