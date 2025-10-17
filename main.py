@@ -27,12 +27,19 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+import streamlit as st
+
+# Hide Streamlit footer completely
 hide_footer_style = """
     <style>
-    footer:after {
-        content: "";
+    /* Hide footer completely */
+    footer {
+        visibility: hidden;
+        height: 0px;
     }
-</style>
+    /* Optional: remove the space left by the footer */
+    .css-1v3fvcr {margin-bottom: 0px;}
+    </style>
 """
 st.markdown(hide_footer_style, unsafe_allow_html=True)
 
