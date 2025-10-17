@@ -17,7 +17,6 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
-footer {visibility: hidden;}
 /* 🔴 Hide Streamlit's floating Deploy/Share button */
 [data-testid="stStatusWidget"] {display: none !important;}
 [data-testid="stToolbarActions"] { visibility: hidden; }
@@ -28,6 +27,14 @@ footer {visibility: hidden;}
 }
 </style>
 """, unsafe_allow_html=True)
+hide_footer_style = """
+    <style>
+    footer:after {
+        content: "";
+    }
+</style>
+"""
+st.markdown(hide_footer_style, unsafe_allow_html=True)
 
 # ------------------- SESSION STATE DEFAULTS -------------------
 default_state = {
