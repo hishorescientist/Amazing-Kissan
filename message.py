@@ -86,33 +86,40 @@ def app():
     username = st.session_state.user.get("username", "Anonymous")
 
     # ---------- Floating Button CSS ----------
-    st.markdown("""
+    # --- Floating Button CSS ---
+st.markdown("""
     <style>
     .floating-btn {
         position: fixed;
-        bottom: 30px;
-        right: 30px;
-        z-index: 9999;
+        bottom: 25px;
+        right: 25px;
+        z-index: 999999; /* very high to ensure visibility */
     }
+
     .floating-btn button {
-        background-color: #FF5733;
+        background-color: #ff5733;
         color: white;
         border: none;
-        padding: 14px 22px;
+        padding: 15px 20px;
         border-radius: 50px;
         font-size: 16px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         cursor: pointer;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        transition: all 0.2s ease-in-out;
     }
+
     .floating-btn button:hover {
-        background-color: #e64523;
+        background-color: #ff784e;
+        transform: scale(1.05);
     }
     </style>
+""", unsafe_allow_html=True)
 
-    <div class="floating-btn">
-        <button onclick="window.location.search='?show_post=1'">✏️ New Message</button>
-    </div>
-    """, unsafe_allow_html=True)
+# --- Floating Button ---
+st.markdown('<div class="floating-btn">', unsafe_allow_html=True)
+if st.button("✏️ New Message", key="fab"):
+    st.session_state.show_post_box = True
+st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------- Toggle Post Box ----------
     if "show_post_box" not in st.session_state:
