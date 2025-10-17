@@ -15,16 +15,22 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
 # Hide default menu & toolbar
 st.markdown("""
-<style>
-#MainMenu { visibility: hidden; }
-/* 🔴 Hide Streamlit's floating Deploy/Share button */
-[data-testid="stStatusWidget"] {display: none !important;}
-[data-testid="stToolbarActions"] { visibility: hidden; }
-[data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
+    <style>
+    #MainMenu { visibility: hidden; }
+    /* 🔴 Hide Streamlit's floating Deploy/Share button */
+    [data-testid="stStatusWidget"] {display: none !important;}
+    [data-testid="stToolbarActions"] { visibility: hidden; }
+    [data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
     color: #FF5733;
-}
+    }
+    /* Hide footer completely */
+    footer {visibility: hidden; height: 0px;}
+    
+    /* Remove any extra bottom space left by footer */
+    .css-1v3fvcr {margin-bottom: 0px;}
+    </style>
 </style>
 """, unsafe_allow_html=True)
 

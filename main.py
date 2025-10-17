@@ -15,33 +15,23 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 
 # Hide default menu & toolbar
 st.markdown("""
-<style>
-#MainMenu { visibility: hidden; }
-/* 🔴 Hide Streamlit's floating Deploy/Share button */
-[data-testid="stStatusWidget"] {display: none !important;}
-[data-testid="stToolbarActions"] { visibility: hidden; }
-[data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
+    <style>
+    #MainMenu { visibility: hidden; }
+    /* 🔴 Hide Streamlit's floating Deploy/Share button */
+    [data-testid="stStatusWidget"] {display: none !important;}
+    [data-testid="stToolbarActions"] { visibility: hidden; }
+    [data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
     content: "🛠️";
     font-size: 20px;
     color: #FF5733;
-}
-</style>
-""", unsafe_allow_html=True)
-import streamlit as st
-
-# Hide Streamlit footer completely
-hide_footer_style = """
-    <style>
-    /* Hide footer completely */
-    footer {
-        visibility: hidden;
-        height: 0px;
     }
-    /* Optional: remove the space left by the footer */
+    /* Hide footer completely */
+    footer {visibility: hidden; height: 0px;}
+    
+    /* Remove any extra bottom space left by footer */
     .css-1v3fvcr {margin-bottom: 0px;}
     </style>
-"""
-st.markdown(hide_footer_style, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ------------------- SESSION STATE DEFAULTS -------------------
 default_state = {
