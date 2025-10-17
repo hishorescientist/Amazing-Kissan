@@ -10,7 +10,6 @@ SCOPE = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-
 # ---------- CONNECT ----------
 @st.cache_resource(show_spinner=False)
 def connect_message_sheet():
@@ -94,43 +93,37 @@ def app():
         right: 30px;
         z-index: 9999;
     }
-    .floating-btn button {
-        background-color: #FF5733;
-        color: white;
-        border: none;
-        padding: 14px 22px;
-        border-radius: 50px;
-        font-size: 16px;
-        cursor: pointer;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-    }
-    .floating-btn button:hover {
-        background-color: #e64523;
+    div[data-testid="floating_new_msg"] > button {
+        background-color: #FF5733 !important;
+        color: white !important;
+        border: none !important;
+        padding: 14px 22px !important;
+        border-radius: 50px !important;
+        font-size: 16px !important;
+        cursor: pointer !important;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important;
     }
     </style>
-    <div class="floating-btn">
-        <form action="#" method="get">
-            <button name="show_post" value="1">✏️ New Message</button>
-        </form>
-    </div>
     """, unsafe_allow_html=True)
 
     # ---------- Toggle Post Box ----------
     if "show_post_box" not in st.session_state:
         st.session_state.show_post_box = False
 
-    if st.query_params.get("show_post") == ["1"]:
+    # Floating button using Streamlit
+    st.markdown('<div class="floating-btn">', unsafe_allow_html=True)
+    if st.button("✏️ New Message", key="floating_new_msg"):
         st.session_state.show_post_box = True
-        st.experimental_set_query_params()  # clear param
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------- Post Box ----------
     if st.session_state.show_post_box:
         with st.form("post_form", clear_on_submit=True):
-            text = st.text_area(f"💭 Message as **{username}**", key="msg_input", height=100)
+            text_input = st.text_area(f"💭 Message as **{username}**", key=f"msg_input_{uuid.uuid4()}", height=100)
             submitted = st.form_submit_button("📨 Send")
             if submitted:
-                if text.strip():
-                    add_message_gsheet(username, text)
+                if text_input.strip():
+                    add_message_gsheet(username, text_input.strip())
                     st.success("✅ Message sent!")
                     st.session_state.show_post_box = False
                     st.rerun()
@@ -168,12 +161,12 @@ def app():
             comments = load_comments_gsheet(msg_id)
             if comments:
                 for c in comments:
-                    st.markdown(f"**{c.get('user')}:** {c.get('text','')}")
+                    st.markdown(f"**{c.get('user','Anonymous')}:** {c.get('text','')}")
                     st.caption(f"🕓 {c.get('time','')}")
             else:
                 st.caption("No comments yet.")
 
-        # Add Comment
+            # Add Comment
             with st.form(f"comment_form_{msg_id}", clear_on_submit=True):
                 comment_text = st.text_area("Reply...", key=f"comment_input_{msg_id}", height=50)
                 comment_submitted = st.form_submit_button("Reply")
