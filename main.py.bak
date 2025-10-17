@@ -139,6 +139,8 @@ elif page == "About":
     about_page()
 elif page == "AI Assistant":
     ai_page()
+elif page == "Message":
+    message_page()
 elif page == "Contact":
     contact_page()
 elif page == "Login":
