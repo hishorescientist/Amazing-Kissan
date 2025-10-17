@@ -87,39 +87,39 @@ def app():
 
     # ---------- Floating Button CSS ----------
     # --- Floating Button CSS ---
-st.markdown("""
-    <style>
-    .floating-btn {
-        position: fixed;
-        bottom: 25px;
-        right: 25px;
-        z-index: 999999; /* very high to ensure visibility */
-    }
+    st.markdown("""
+        <style>
+        .floating-btn {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 999999; /* very high to ensure visibility */
+        }
 
-    .floating-btn button {
-        background-color: #ff5733;
-        color: white;
-        border: none;
-        padding: 15px 20px;
-        border-radius: 50px;
-        font-size: 16px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-    }
+        .floating-btn button {
+            background-color: #ff5733;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 50px;
+            font-size: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
 
-    .floating-btn button:hover {
-        background-color: #ff784e;
-        transform: scale(1.05);
-    }
-    </style>
-""", unsafe_allow_html=True)
+        .floating-btn button:hover {
+            background-color: #ff784e;
+            transform: scale(1.05);
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-# --- Floating Button ---
-st.markdown('<div class="floating-btn">', unsafe_allow_html=True)
-if st.button("✏️ New Message", key="fab"):
-    st.session_state.show_post_box = True
-st.markdown('</div>', unsafe_allow_html=True)
+    # --- Floating Button ---
+    st.markdown('<div class="floating-btn">', unsafe_allow_html=True)
+    if st.button("✏️ New Message", key="fab"):
+        st.session_state.show_post_box = True
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------- Toggle Post Box ----------
     if "show_post_box" not in st.session_state:
