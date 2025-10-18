@@ -156,4 +156,4 @@ if st.sidebar.button("🗑️ Clear My Data"):
     clear_state()
     for k in default_state:
         st.session_state[k] = default_state[k]
-    st.experimental_rerun()
+    st.rerun()
