@@ -64,11 +64,7 @@ if "state_loaded" not in st.session_state:
 # ------------------- SIDEBAR -------------------
 st.sidebar.title("🌿 Navigation")
 
-main_menu = ["Home", "Message", "About", "Contact"]
-if st.session_state.logged_in:
-    main_menu.append("Profile")
-else:
-    main_menu.append("Login")
+main_menu = ["Home", "Message"]
 
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
@@ -125,6 +121,17 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=set_old_topic
             )
 
+main_menu = ["About", "Contact"]
+if st.session_state.logged_in:
+    main_menu.append("Profile")
+else:
+    main_menu.append("Login")
+
+for item in main_menu:
+    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
+        st.session_state.page = item
+        st.session_state.redirect_done = False
+        st.rerun()
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page
 if page == "Home":
@@ -149,10 +156,3 @@ try:
     save_state(state_to_save)
 except Exception as e:
     st.warning(f"Could not save state: {e}")
-
-# ------------------- CLEAR LOCAL DATA -------------------
-if st.sidebar.button("🗑️ Clear My Data"):
-    clear_state()
-    for k in default_state:
-        st.session_state[k] = default_state[k]
-    st.rerun()
