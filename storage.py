@@ -1,22 +1,46 @@
 # storage.py
 import json
-import os
+import streamlit as st
+from streamlit_js_eval import streamlit_js_eval
 
-FILENAME = "local_activity.json"
+# Key used in browser localStorage
+STORAGE_KEY = "agri_local_state"
 
 def save_state(data: dict):
+    """
+    Save app state to the user's browser localStorage.
+    """
     try:
-        with open(FILENAME, "w") as f:
-            json.dump(data, f, indent=4)
+        js_code = f"window.localStorage.setItem('{STORAGE_KEY}', '{json.dumps(data)}');"
+        streamlit_js_eval(js_expressions=js_code, key="saveLocalStorage")
     except Exception as e:
-        print("Error saving state:", e)
+        st.warning(f"Could not save local state: {e}")
 
-def load_state():
-    if os.path.exists(FILENAME):
-        try:
-            with open(FILENAME, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            print("Error loading state:", e)
-            return {}
+def load_state() -> dict:
+    """
+    Load app state from the user's browser localStorage.
+    """
+    try:
+        raw = streamlit_js_eval(
+            js_expressions=f"window.localStorage.getItem('{STORAGE_KEY}')",
+            key="loadLocalStorage",
+            want_output=True
+        )
+        if raw:
+            return json.loads(raw)
+    except Exception as e:
+        st.warning(f"Could not load local state: {e}")
     return {}
+
+def clear_state():
+    """
+    Clear user's saved local state from browser localStorage.
+    """
+    try:
+        streamlit_js_eval(
+            js_expressions=f"window.localStorage.removeItem('{STORAGE_KEY}');",
+            key="clearLocalStorage"
+        )
+        st.success("Local data cleared! Refresh the page to start fresh.")
+    except Exception as e:
+        st.warning(f"Could not clear local state: {e}")

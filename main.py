@@ -1,4 +1,3 @@
-# main.py
 import streamlit as st
 from login import app as login_page
 from profile import app as profile_page
@@ -42,18 +41,16 @@ for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- LOAD LOCAL STATE (ONCE) -------------------
+# ------------------- LOAD LOCAL STATE (ONCE, PER USER) -------------------
 if "state_loaded" not in st.session_state:
     try:
-        saved_state = load_state()
+        saved_state = load_state()  # loads from browser localStorage
         for k, v in saved_state.items():
-            if k in default_state and k != "page":  # Skip overwriting page
+            if k in default_state and k != "page":  # skip overwriting page
                 st.session_state[k] = v
-        # Set page only if it exists in saved state
         if "page" in saved_state and saved_state["page"] in default_state.keys():
             st.session_state["page"] = saved_state["page"]
         st.session_state["state_loaded"] = True
-        # Only rerun if page is not Home to show saved page immediately
         if st.session_state["page"] != "Home":
             st.rerun()
     except Exception as e:
@@ -70,7 +67,6 @@ for item in main_menu:
         st.rerun()
 
 # ------------------- AI OPTIONS -------------------
-#st.sidebar.markdown("---")
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
     if st.button("🆕 New Chat", key="ai_new", use_container_width=True):
         st.session_state.current_topic = None
@@ -116,7 +112,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 key="selected_old_topic_main",
                 on_change=set_old_topic
             )
-            
 
 main_menu = ["Message", "About", "Contact"]
 if st.session_state.logged_in:
@@ -128,8 +123,6 @@ for item in main_menu:
         st.session_state.page = item
         st.session_state.redirect_done = False
         st.rerun()
-
-
 
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page
@@ -148,10 +141,10 @@ elif page == "Login":
 elif page == "Profile":
     profile_page()
 
-# ------------------- SAVE LOCAL STATE -------------------
+# ------------------- SAVE LOCAL STATE (PER USER) -------------------
 try:
     keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
     state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
-    save_state(state_to_save)
+    save_state(state_to_save)  # saves to browser localStorage
 except Exception as e:
     st.warning(f"Could not save state: {e}")
