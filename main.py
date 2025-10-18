@@ -5,9 +5,8 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-from storage import save_state, load_state
+from storage import save_state, load_state, clear_state
 from message import app as message_page
-#from market import app as market_page
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
@@ -37,16 +36,17 @@ default_state = {
     "user_chats": {},
     "redirect_done": False
 }
+
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- LOAD LOCAL STATE (ONCE, PER USER) -------------------
+# ------------------- LOAD LOCAL STATE (PER DEVICE) -------------------
 if "state_loaded" not in st.session_state:
     try:
-        saved_state = load_state()  # loads from browser localStorage
+        saved_state = load_state()
         for k, v in saved_state.items():
-            if k in default_state and k != "page":  # skip overwriting page
+            if k in default_state and k != "page":
                 st.session_state[k] = v
         if "page" in saved_state and saved_state["page"] in default_state.keys():
             st.session_state["page"] = saved_state["page"]
@@ -113,11 +113,13 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=set_old_topic
             )
 
+# ------------------- LOGIN / PROFILE MENU -------------------
 main_menu = ["Message", "About", "Contact"]
 if st.session_state.logged_in:
     main_menu.append("Profile")
 else:
     main_menu.append("Login")
+
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
         st.session_state.page = item
@@ -141,10 +143,17 @@ elif page == "Login":
 elif page == "Profile":
     profile_page()
 
-# ------------------- SAVE LOCAL STATE (PER USER) -------------------
+# ------------------- SAVE LOCAL STATE (PER DEVICE) -------------------
 try:
     keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
     state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
-    save_state(state_to_save)  # saves to browser localStorage
+    save_state(state_to_save)
 except Exception as e:
     st.warning(f"Could not save state: {e}")
+
+# ------------------- OPTIONAL: CLEAR LOCAL DATA BUTTON -------------------
+if st.sidebar.button("🗑️ Clear My Data"):
+    clear_state()
+    for k in default_state:
+        st.session_state[k] = default_state[k]
+    st.rerun()
