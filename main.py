@@ -10,6 +10,28 @@ from storage import save_state, load_state, clear_state
 import streamlit.components.v1 as components
 st.markdown("""
     <style>
+    .chat-container {
+        display: flex;
+        margin-bottom: 10px;
+    }
+    .user-msg {
+        background-color: #DCF8C6;
+        padding: 10px;
+        border-radius: 10px;
+        max-width: 60%;
+        margin-right: auto;
+    }
+    .ai-msg {
+        background-color: #E6E6E6;
+        padding: 10px;
+        border-radius: 10px;
+        max-width: 60%;
+        margin-left: auto;
+    }
+    </style>
+""", unsafe_allow_html=True)
+st.markdown("""
+    <style>
     /* Find the container that holds the tab buttons */
     div[role="tablist"] {
         display: flex;

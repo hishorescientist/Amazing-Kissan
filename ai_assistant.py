@@ -166,10 +166,18 @@ def app():
 
     # ---------------- Display Chat History ----------------
     if st.session_state.ai_history:
-        for msg in st.session_state.ai_history:
-            st.markdown(f"**🧑‍🌾 You:** {msg['question']}")
-            st.markdown(f"**🤖 AI:** {msg['answer']}")
-            st.markdown("---")
+        for msg in st.session_state.get('ai_history', []):
+            st.markdown(
+                f"""
+                <div class="chat-container">
+                    <div class="user-msg"><b>🧑‍🌾 You:</b> {msg['question']}</div>
+                </div>
+                <div class="chat-container">
+                    <div class="ai-msg"><b>🤖 AI:</b> {msg['answer']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
     else:
         st.info("💬 Start chatting below!")
 
