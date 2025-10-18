@@ -15,18 +15,12 @@ st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
 st.markdown("""
 <style>
 #MainMenu { visibility: hidden; }
-/* 🔴 Hide Streamlit's floating Deploy/Share button */
 [data-testid="stStatusWidget"] {display: none !important;}
 [data-testid="stToolbarActions"] { visibility: hidden; }
-[data-testid="st.sidebar"] button[aria-label="Toggle sidebar"]::before {
-    content: "🛠️";
-    font-size: 20px;
-    color: #FF5733;
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------- SESSION STATE DEFAULTS -------------------
+# ------------------- DEFAULT SESSION STATE -------------------
 default_state = {
     "page": "Home",
     "logged_in": False,
@@ -44,21 +38,25 @@ for k, v in default_state.items():
 # ------------------- LOAD LOCAL STATE (PER DEVICE) -------------------
 if "state_loaded" not in st.session_state:
     try:
-        saved_state = load_state()
-        for k, v in saved_state.items():
-            if k in default_state and k != "page":
-                st.session_state[k] = v
-        if "page" in saved_state and saved_state["page"] in default_state.keys():
-            st.session_state["page"] = saved_state["page"]
+        saved_state = load_state()  # loads from browser localStorage
+        if saved_state:
+            for k, v in saved_state.items():
+                if k in default_state:
+                    st.session_state[k] = v
         st.session_state["state_loaded"] = True
         if st.session_state["page"] != "Home":
             st.rerun()
     except Exception as e:
         st.warning(f"Could not load previous state: {e}")
 
-# ------------------- SIDEBAR MENU -------------------
+# ------------------- SIDEBAR -------------------
 st.sidebar.title("🌿 Navigation")
-main_menu = ["Home"]
+
+main_menu = ["Home", "Message", "About", "Contact"]
+if st.session_state.logged_in:
+    main_menu.append("Profile")
+else:
+    main_menu.append("Login")
 
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
@@ -113,19 +111,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=set_old_topic
             )
 
-# ------------------- LOGIN / PROFILE MENU -------------------
-main_menu = ["Message", "About", "Contact"]
-if st.session_state.logged_in:
-    main_menu.append("Profile")
-else:
-    main_menu.append("Login")
-
-for item in main_menu:
-    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
-        st.session_state.page = item
-        st.session_state.redirect_done = False
-        st.rerun()
-
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page
 if page == "Home":
@@ -139,7 +124,7 @@ elif page == "Message":
 elif page == "Contact":
     contact_page()
 elif page == "Login":
-    login_page()
+    login_page()  # uses your existing login.py unchanged
 elif page == "Profile":
     profile_page()
 
@@ -151,9 +136,9 @@ try:
 except Exception as e:
     st.warning(f"Could not save state: {e}")
 
-# ------------------- OPTIONAL: CLEAR LOCAL DATA BUTTON -------------------
-#if st.sidebar.button("🗑️ Clear My Data"):
-#    clear_state()
-#    for k in default_state:
-#        st.session_state[k] = default_state[k]
-#    st.rerun()
+# ------------------- CLEAR LOCAL DATA -------------------
+if st.sidebar.button("🗑️ Clear My Data"):
+    clear_state()
+    for k in default_state:
+        st.session_state[k] = default_state[k]
+    st.experimental_rerun()

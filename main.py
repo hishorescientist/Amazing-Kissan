@@ -5,8 +5,9 @@ from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
 from contact import app as contact_page
-from storage import save_state, load_state, clear_state
 from message import app as message_page
+from storage import save_state, load_state, clear_state
+import streamlit.components.v1 as components
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
@@ -35,10 +36,21 @@ for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ------------------- LOAD LOCAL STATE (PER DEVICE) -------------------
+# ------------------- LOAD STATE FROM LOCAL STORAGE -------------------
+# Sync browser -> Streamlit (runs once)
+components.html("""
+<script>
+const saved = localStorage.getItem("agri_app_state");
+if (saved) {
+  const data = JSON.parse(saved);
+  window.parent.postMessage({ type: "RESTORE_STATE", data: data }, "*");
+}
+</script>
+""", height=0)
+
 if "state_loaded" not in st.session_state:
     try:
-        saved_state = load_state()  # loads from browser localStorage
+        saved_state = load_state()  # load from browser cache
         if saved_state:
             for k, v in saved_state.items():
                 if k in default_state:
@@ -92,11 +104,12 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                                 "answer": row.get("answer", "")
                             })
                     st.session_state.user_chats = user_chats
-                except:
+                except Exception:
                     pass
 
         if st.session_state.user_chats:
             topics = list(st.session_state.user_chats.keys())
+
             def set_old_topic():
                 st.session_state.current_topic = st.session_state.selected_old_topic_main
                 st.session_state.ai_history = st.session_state.user_chats.get(
@@ -104,6 +117,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 )
                 st.session_state.page = "AI Assistant"
                 st.rerun()
+
             st.selectbox(
                 "📚 Select a saved chat:",
                 topics[::-1],
@@ -124,11 +138,11 @@ elif page == "Message":
 elif page == "Contact":
     contact_page()
 elif page == "Login":
-    login_page()  # uses your existing login.py unchanged
+    login_page()
 elif page == "Profile":
     profile_page()
 
-# ------------------- SAVE LOCAL STATE (PER DEVICE) -------------------
+# ------------------- SAVE LOCAL STATE -------------------
 try:
     keys_to_save = ["page", "logged_in", "user", "ai_history", "current_topic", "user_chats"]
     state_to_save = {k: st.session_state.get(k) for k in keys_to_save}
@@ -141,4 +155,4 @@ if st.sidebar.button("🗑️ Clear My Data"):
     clear_state()
     for k in default_state:
         st.session_state[k] = default_state[k]
-    st.experimental_rerun()
+    st.rerun()
