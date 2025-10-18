@@ -8,6 +8,31 @@ from contact import app as contact_page
 from message import app as message_page
 from storage import save_state, load_state, clear_state
 import streamlit.components.v1 as components
+st.markdown("""
+    <style>
+    /* Find the container that holds the tab buttons */
+    div[role="tablist"] {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    /* Optional: make the tabs prettier */
+    button[role="tab"] {
+        font-size: 17px;
+        font-weight: 600;
+        color: #2E8B57;
+        border-radius: 8px;
+        padding: 6px 18px;
+    }
+
+    /* Highlight the active tab */
+    button[role="tab"][aria-selected="true"] {
+        background-color: #2E8B57 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")

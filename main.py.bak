@@ -156,10 +156,3 @@ try:
     save_state(state_to_save)
 except Exception as e:
     st.warning(f"Could not save state: {e}")
-
-# ------------------- CLEAR LOCAL DATA -------------------
-if st.sidebar.button("🗑️ Clear My Data"):
-    clear_state()
-    for k in default_state:
-        st.session_state[k] = default_state[k]
-    st.rerun()

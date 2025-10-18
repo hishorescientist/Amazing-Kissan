@@ -92,8 +92,12 @@ def app():
     st.session_state.setdefault("user", None)
 
     if not st.session_state.logged_in:
-        st.title("🔐 Log in / Register")
-        st.markdown("You are required to log in every time you enter the app")
+        st.markdown("""
+            <h2 style='text-align:center; color:#2E8B57;'>🔐 Log in / Register</h2>
+            <p style='text-align:center; font-size:18px; color:#808080;'>
+                You are required to log in every time you enter the app.
+            </p>
+        """, unsafe_allow_html=True)
         login_tab, register_tab = st.tabs(["Login", "Register"])
 
         # ---------------- LOGIN TAB ----------------
