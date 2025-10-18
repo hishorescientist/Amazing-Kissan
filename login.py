@@ -93,7 +93,7 @@ def app():
 
     if not st.session_state.logged_in:
         st.markdown("""
-            <h2 style='text-align:center; color:#2E8B57;'>🔐 Log in / Register</h2>
+            <h1 style='text-align:center; color:#2E8B57;'>🔐 Log in / Register</h1>
             <p style='text-align:center; font-size:18px; color:#808080;'>
                 You are required to log in every time you enter the app.
             </p>
