@@ -101,18 +101,11 @@ if (saved) {
 </script>
 """, height=0)
 
+# ------------------- INITIALIZE LOCAL STORAGE SYNC -------------------
 if "state_loaded" not in st.session_state:
-    try:
-        saved_state = load_state()  # load from browser cache
-        if saved_state:
-            for k, v in saved_state.items():
-                if k in default_state:
-                    st.session_state[k] = v
-        st.session_state["state_loaded"] = True
-        if st.session_state["page"] != "Home":
-            st.rerun()
-    except Exception as e:
-        st.warning(f"Could not load previous state: {e}")
+    from storage import load_state
+    load_state()  # Triggers browser to send stored data
+    st.session_state["state_loaded"] = True
 
 # ------------------- SIDEBAR -------------------
 st.sidebar.title("🌿 Navigation")

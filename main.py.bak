@@ -82,6 +82,12 @@ default_state = {
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
+        
+# ------------------- INITIALIZE LOCAL STORAGE SYNC -------------------
+if "initialized" not in st.session_state:
+    from storage import load_state
+    load_state()  # Triggers browser localStorage load
+    st.session_state["initialized"] = True
 
 # ------------------- LOAD STATE FROM LOCAL STORAGE -------------------
 # Sync browser -> Streamlit (runs once)
