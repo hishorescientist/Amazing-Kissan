@@ -91,7 +91,7 @@ def app():
     # If user is already logged in → go directly to profile
     if st.session_state.get("logged_in") and st.session_state.get("user"):
         st.session_state.page = "Profile"
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("""
         <h1 style='text-align:center; color:#2E8B57;'>🔐 Log in / Register</h1>
@@ -124,7 +124,7 @@ def app():
                         "user": st.session_state.user
                     })
 
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("❌ Invalid username or password.")
 
