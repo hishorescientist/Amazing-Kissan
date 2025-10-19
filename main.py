@@ -125,7 +125,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-#        st.rerun()
+        st.rerun()
 
     if st.session_state.logged_in and st.session_state.user:
         if not st.session_state.user_chats:
@@ -159,7 +159,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                     st.session_state.current_topic, []
                 )
                 st.session_state.page = "AI Assistant"
-#                st.rerun()
+                st.rerun()
 
             st.selectbox(
                 "📚 Select a saved chat:",
