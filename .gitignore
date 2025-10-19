@@ -108,4 +108,5 @@ dmypy.json
 
 # Coverage.py
 .coverage
-coverage.xml
+coverage.xml.streamlit/secrets.toml
+.streamlit/secrets.toml.bak
