@@ -19,14 +19,14 @@ st.markdown("""
         padding: 10px;
         border-radius: 10px;
         max-width: 80%;
-        margin-right: auto;
+        margin-left: auto;
     }
     .ai-msg {
         background-color: #E6E6E6;
         padding: 10px;
         border-radius: 10px;
         max-width: 80%;
-        margin-left: auto;
+        margin-right: auto;
     }
     </style>
 """, unsafe_allow_html=True)
