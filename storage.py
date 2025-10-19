@@ -2,35 +2,51 @@ import streamlit as st
 import json
 import streamlit.components.v1 as components
 
-# ✅ Save state to user's browser (localStorage)
-def save_state(state_data):
-    js_code = f"""
-    <script>
-    const data = {json.dumps(state_data)};
-    localStorage.setItem("agri_app_state", JSON.stringify(data));
-    </script>
-    """
-    components.html(js_code, height=0)
+LOCAL_KEY = "agri_app_state"
 
-# ✅ Load state from browser
-def load_state():
-    load_js = """
-    <script>
-    const saved = localStorage.getItem("agri_app_state");
-    if (saved) {{
-        const data = JSON.parse(saved);
-        window.parent.postMessage({{type: 'STATE_RESTORE', data: data}}, "*");
-    }}
-    </script>
-    """
-    components.html(load_js, height=0)
-    return None  # Loaded asynchronously by JS
+# --- JavaScript bridge ---
+def inject_local_storage_bridge():
+    components.html(f"""
+        <script>
+        const stateKey = '{LOCAL_KEY}';
 
-# ✅ Clear user’s local storage (on logout)
+        // Listen for messages from Streamlit (Python → JS)
+        window.addEventListener("message", (event) => {{
+            if (event.data.type === "SAVE_STATE") {{
+                localStorage.setItem(stateKey, JSON.stringify(event.data.data));
+            }}
+            if (event.data.type === "CLEAR_STATE") {{
+                localStorage.removeItem(stateKey);
+            }}
+        }});
+
+        // On page load, send stored data (JS → Python)
+        const saved = localStorage.getItem(stateKey);
+        if (saved) {{
+            const parsed = JSON.parse(saved);
+            window.parent.postMessage({{ type: "RESTORE_STATE", data: parsed }}, "*");
+        }}
+        </script>
+    """, height=0)
+
+
+# --- Save Streamlit state to browser localStorage ---
+def save_state(state_dict):
+    data_json = json.dumps(state_dict)
+    components.html(f"""
+        <script>
+        window.postMessage({{
+            type: "SAVE_STATE",
+            data: {data_json}
+        }}, "*");
+        </script>
+    """, height=0)
+
+
+# --- Clear localStorage (logout/reset) ---
 def clear_state():
-    clear_js = """
-    <script>
-    localStorage.removeItem("agri_app_state");
-    </script>
-    """
-    components.html(clear_js, height=0)
+    components.html("""
+        <script>
+        window.postMessage({ type: "CLEAR_STATE" }, "*");
+        </script>
+    """, height=0)
