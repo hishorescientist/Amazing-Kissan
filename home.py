@@ -47,7 +47,7 @@ def app():
     """, unsafe_allow_html=True)
 
     # --- Header ---
-    st.markdown("<h1>🏠 Welcome to Agriculture Assistant</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>🏠 Welcome to Amazing Kissan</h1>", unsafe_allow_html=True)
     st.markdown("<h3>Empowering Farmers with Smart Technology 🌱</h3>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -55,13 +55,13 @@ def app():
     st.markdown("""
         <div class="card">
         <h2>About the Platform</h2>
-        <p><b>Agriculture Assistant</b> is your all-in-one platform designed to help farmers and agri-enthusiasts 
+        <p><b>Amazing kissan</b> is your all-in-one platform designed to help farmers and agri-enthusiasts 
         manage their activities, learn modern techniques, and connect with essential resources.</p>
         </div>
     """, unsafe_allow_html=True)
 
     # --- Features Section ---
-    st.markdown("<h2>🌟 Key Features</h2>", unsafe_allow_html=True)
+    st.markdown("<h2><b>🌟 Key Features</b></h2>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
@@ -87,7 +87,7 @@ def app():
         """, unsafe_allow_html=True)
 
     # --- Quick Tips Section ---
-    st.markdown("<h2>💡 Quick Agricultural Tips</h2>", unsafe_allow_html=True)
+    st.markdown("<h2><b>💡 Quick Agricultural Tips</b></h2>", unsafe_allow_html=True)
     tips = [
         "Use organic compost to enhance soil fertility naturally.",
         "Avoid overwatering—most crops need consistent, not excessive, moisture.",
