@@ -1,53 +1,36 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import json
+import streamlit.components.v1 as components
 
-# ------------------ SAVE STATE ------------------
-def save_state(state_dict):
+# ✅ Save state to user's browser (localStorage)
+def save_state(state_data):
+    js_code = f"""
+    <script>
+    const data = {json.dumps(state_data)};
+    localStorage.setItem("agri_app_state", JSON.stringify(data));
+    </script>
     """
-    Save Streamlit session state to browser localStorage.
-    """
-    try:
-        json_data = json.dumps(state_dict)
-        components.html(f"""
-        <script>
-        localStorage.setItem("agri_app_state", JSON.stringify({json_data}));
-        </script>
-        """, height=0)
-    except Exception as e:
-        st.warning(f"Save error: {e}")
+    components.html(js_code, height=0)
 
-
-# ------------------ LOAD STATE ------------------
+# ✅ Load state from browser
 def load_state():
-    """
-    Load Streamlit state from browser localStorage.
-    (Note: Streamlit cannot directly read JS values; this triggers sync.)
-    """
-    components.html("""
+    load_js = """
     <script>
     const saved = localStorage.getItem("agri_app_state");
     if (saved) {{
         const data = JSON.parse(saved);
-        window.parent.postMessage({{ type: "RESTORE_STATE", data: data }}, "*");
+        window.parent.postMessage({{type: 'STATE_RESTORE', data: data}}, "*");
     }}
     </script>
-    """, height=0)
+    """
+    components.html(load_js, height=0)
+    return None  # Loaded asynchronously by JS
 
-    # This can’t receive JS data directly, but allows prefill from previous sync
-    if "local_state_cache" in st.session_state:
-        return st.session_state.local_state_cache
-    return None
-
-
-# ------------------ CLEAR STATE ------------------
+# ✅ Clear user’s local storage (on logout)
 def clear_state():
-    """
-    Clears the localStorage data for this app only.
-    """
-    components.html("""
+    clear_js = """
     <script>
     localStorage.removeItem("agri_app_state");
-    alert("🧹 Local data cleared!");
     </script>
-    """, height=0)
+    """
+    components.html(clear_js, height=0)
