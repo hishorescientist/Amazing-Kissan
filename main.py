@@ -56,7 +56,7 @@ for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------- AI OPTIONS -------------------
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
@@ -116,7 +116,7 @@ for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}_main"):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page

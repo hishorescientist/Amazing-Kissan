@@ -8,65 +8,26 @@ from contact import app as contact_page
 from message import app as message_page
 from storage import inject_local_storage_bridge, save_state, clear_state
 import streamlit.components.v1 as components
+
+# ------------------- CUSTOM CSS -------------------
 st.markdown("""
     <style>
-    .chat-container {
-        display: flex;
-        margin-bottom: 10px;
-    }
-    .user-msg {
-        background-color: #DCF8C6;
-        padding: 10px;
-        border-radius: 10px;
-        max-width: 80%;
-        margin-right: auto;
-    }
-    .ai-msg {
-        background-color: #E6E6E6;
-        padding: 10px;
-        border-radius: 10px;
-        max-width: 80%;
-        margin-left: auto;
-    }
-    </style>
-""", unsafe_allow_html=True)
-st.markdown("""
-    <style>
-    /* Find the container that holds the tab buttons */
-    div[role="tablist"] {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-    }
+    .chat-container { display: flex; margin-bottom: 10px; }
+    .user-msg { background-color: #DCF8C6; padding: 10px; border-radius: 10px; max-width: 80%; margin-right: auto; }
+    .ai-msg { background-color: #E6E6E6; padding: 10px; border-radius: 10px; max-width: 80%; margin-left: auto; }
 
-    /* Optional: make the tabs prettier */
-    button[role="tab"] {
-        font-size: 17px;
-        font-weight: 600;
-        color: #2E8B57;
-        border-radius: 8px;
-        padding: 6px 18px;
-    }
+    div[role="tablist"] { display: flex; justify-content: center; gap: 10px; }
+    button[role="tab"] { font-size: 17px; font-weight: 600; color: #2E8B57; border-radius: 8px; padding: 6px 18px; }
+    button[role="tab"][aria-selected="true"] { background-color: #2E8B57 !important; color: white !important; }
 
-    /* Highlight the active tab */
-    button[role="tab"][aria-selected="true"] {
-        background-color: #2E8B57 !important;
-        color: white !important;
-    }
+    #MainMenu { visibility: hidden; }
+    [data-testid="stStatusWidget"] { display: none !important; }
+    [data-testid="stToolbarActions"] { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
-
-# Hide default menu & toolbar
-st.markdown("""
-<style>
-#MainMenu { visibility: hidden; }
-[data-testid="stStatusWidget"] {display: none !important;}
-[data-testid="stToolbarActions"] { visibility: hidden; }
-</style>
-""", unsafe_allow_html=True)
 
 # ------------------- DEFAULT SESSION STATE -------------------
 default_state = {
@@ -82,41 +43,20 @@ default_state = {
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
-        
+
 # ------------------- INITIALIZE LOCAL STORAGE SYNC -------------------
 if "initialized" not in st.session_state:
-    from storage import load_state
-    load_state()  # Triggers browser localStorage load
+    inject_local_storage_bridge()
     st.session_state["initialized"] = True
-
-# ------------------- LOAD STATE FROM LOCAL STORAGE -------------------
-# Sync browser -> Streamlit (runs once)
-components.html("""
-<script>
-const saved = localStorage.getItem("agri_app_state");
-if (saved) {
-  const data = JSON.parse(saved);
-  window.parent.postMessage({ type: "RESTORE_STATE", data: data }, "*");
-}
-</script>
-""", height=0)
-
-# ------------------- INITIALIZE LOCAL STORAGE SYNC -------------------
-if "state_loaded" not in st.session_state:
-    from storage import load_state
-    load_state()  # Triggers browser to send stored data
-    st.session_state["state_loaded"] = True
 
 # ------------------- SIDEBAR -------------------
 st.sidebar.title("🌿 Navigation")
-
 main_menu = ["Home", "Message"]
-
 for item in main_menu:
     if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.rerun()
+        st.experimental_rerun()
 
 # ------------------- AI OPTIONS -------------------
 with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
@@ -124,7 +64,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
         st.session_state.current_topic = None
         st.session_state.ai_history = []
         st.session_state.page = "AI Assistant"
-#        st.rerun()
 
     if st.session_state.logged_in and st.session_state.user:
         if not st.session_state.user_chats:
@@ -158,7 +97,6 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                     st.session_state.current_topic, []
                 )
                 st.session_state.page = "AI Assistant"
-#                st.rerun()
 
             st.selectbox(
                 "📚 Select a saved chat:",
@@ -167,6 +105,7 @@ with st.sidebar.expander("⚙️ AI Assistant Options", expanded=False):
                 on_change=set_old_topic
             )
 
+# ------------------- MAIN MENU -------------------
 main_menu = ["About", "Contact"]
 if st.session_state.logged_in:
     main_menu.append("Profile")
@@ -174,10 +113,11 @@ else:
     main_menu.append("Login")
 
 for item in main_menu:
-    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}"):
+    if st.sidebar.button(item, use_container_width=True, key=f"nav_{item}_main"):
         st.session_state.page = item
         st.session_state.redirect_done = False
-        st.rerun()
+        st.experimental_rerun()
+
 # ------------------- PAGE ROUTING -------------------
 page = st.session_state.page
 if page == "Home":
