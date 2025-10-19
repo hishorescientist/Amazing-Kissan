@@ -1,52 +1,53 @@
 import streamlit as st
-import json
 import streamlit.components.v1 as components
+import json
 
-LOCAL_KEY = "agri_app_state"
-
-# --- JavaScript bridge ---
-def inject_local_storage_bridge():
-    components.html(f"""
-        <script>
-        const stateKey = '{LOCAL_KEY}';
-
-        // Listen for messages from Streamlit (Python → JS)
-        window.addEventListener("message", (event) => {{
-            if (event.data.type === "SAVE_STATE") {{
-                localStorage.setItem(stateKey, JSON.stringify(event.data.data));
-            }}
-            if (event.data.type === "CLEAR_STATE") {{
-                localStorage.removeItem(stateKey);
-            }}
-        }});
-
-        // On page load, send stored data (JS → Python)
-        const saved = localStorage.getItem(stateKey);
-        if (saved) {{
-            const parsed = JSON.parse(saved);
-            window.parent.postMessage({{ type: "RESTORE_STATE", data: parsed }}, "*");
-        }}
-        </script>
-    """, height=0)
-
-
-# --- Save Streamlit state to browser localStorage ---
+# ------------------ SAVE STATE ------------------
 def save_state(state_dict):
-    data_json = json.dumps(state_dict)
-    components.html(f"""
+    """
+    Save Streamlit session state to browser localStorage.
+    """
+    try:
+        json_data = json.dumps(state_dict)
+        components.html(f"""
         <script>
-        window.postMessage({{
-            type: "SAVE_STATE",
-            data: {data_json}
-        }}, "*");
+        localStorage.setItem("agri_app_state", JSON.stringify({json_data}));
         </script>
+        """, height=0)
+    except Exception as e:
+        st.warning(f"Save error: {e}")
+
+
+# ------------------ LOAD STATE ------------------
+def load_state():
+    """
+    Load Streamlit state from browser localStorage.
+    (Note: Streamlit cannot directly read JS values; this triggers sync.)
+    """
+    components.html("""
+    <script>
+    const saved = localStorage.getItem("agri_app_state");
+    if (saved) {{
+        const data = JSON.parse(saved);
+        window.parent.postMessage({{ type: "RESTORE_STATE", data: data }}, "*");
+    }}
+    </script>
     """, height=0)
 
+    # This can’t receive JS data directly, but allows prefill from previous sync
+    if "local_state_cache" in st.session_state:
+        return st.session_state.local_state_cache
+    return None
 
-# --- Clear localStorage (logout/reset) ---
+
+# ------------------ CLEAR STATE ------------------
 def clear_state():
+    """
+    Clears the localStorage data for this app only.
+    """
     components.html("""
-        <script>
-        window.postMessage({ type: "CLEAR_STATE" }, "*");
-        </script>
+    <script>
+    localStorage.removeItem("agri_app_state");
+    alert("🧹 Local data cleared!");
+    </script>
     """, height=0)
