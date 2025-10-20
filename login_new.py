@@ -112,7 +112,8 @@ def app():
     sheet = connect_google_sheet()
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
-    st.session_state.setdefault("fp_stage", "email")  # "email" -> "code" -> "reset"
+    st.session_state.setdefault("show_forgot", False)
+    st.session_state.setdefault("fp_stage", "email")
     st.session_state.setdefault("fp_code", None)
     st.session_state.setdefault("fp_user", None)
 
@@ -128,82 +129,104 @@ def app():
 
         # ---------------- LOGIN TAB ----------------
         with login_tab:
-            username_or_email = st.text_input("Username or Email", placeholder="Enter your username or email", key="login_user")
-            password = st.text_input("Password", type="password", placeholder="Enter your password", key="login_pass")
+            if not st.session_state.show_forgot:
+                username_or_email = st.text_input("Username or Email", placeholder="Enter your username or email", key="login_user")
+                password = st.text_input("Password", type="password", placeholder="Enter your password", key="login_pass")
 
-            if st.button("Login", use_container_width=True):
-                if not username_or_email or not password:
-                    st.warning("⚠️ Fill in both fields.")
-                else:
-                    user = verify_user(sheet, username_or_email, password)
-                    if user:
-                        st.session_state.logged_in = True
-                        st.session_state.user = user
-                        st.session_state.page = "Profile"
-                        st.success(f"✅ Welcome {user['username']}! Redirecting...")
-                        st.rerun()
+                if st.button("Login", use_container_width=True):
+                    if not username_or_email or not password:
+                        st.warning("⚠️ Fill in both fields.")
                     else:
-                        st.error("❌ Invalid username/email or password.")
-
-            # ---------------- FORGOT PASSWORD ----------------
-            st.markdown("### 🔑 Forgot Password?")
-
-            # Step 1: Ask Email
-            if st.session_state.fp_stage == "email":
-                fp_email = st.text_input("Enter your registered email", key="fp_email")
-                if st.button("Send Verification Code", use_container_width=True, key="fp_send_code"):
-                    users = get_all_users(sheet)
-                    matched_user = next(
-                        (u for u in users if str(u.get("email") or "").strip().lower() == fp_email.strip().lower()), 
-                        None
-                    )
-                    if not matched_user:
-                        st.error("❌ No account found with this email.")
-                    else:
-                        code = random.randint(100000, 999999)
-                        st.session_state.fp_code = str(code)
-                        st.session_state.fp_user = matched_user
-                        if send_email(fp_email, "Password Reset Code", f"Your verification code is: {code}"):
-                            st.session_state.fp_stage = "code"
-                            st.success("✅ Code sent to your email! Enter it below.")
+                        user = verify_user(sheet, username_or_email, password)
+                        if user:
+                            st.session_state.logged_in = True
+                            st.session_state.user = user
+                            st.session_state.page = "Profile"
+                            st.success(f"✅ Welcome {user['username']}! Redirecting...")
                             st.rerun()
+                        else:
+                            st.error("❌ Invalid username/email or password.")
 
-            # Step 2: Enter Code
-            elif st.session_state.fp_stage == "code":
-                entered_code = st.text_input("Enter Verification Code", key="fp_entered_code")
-                if st.button("Verify Code", use_container_width=True, key="fp_verify_code"):
-                    if entered_code == st.session_state.fp_code:
-                        st.session_state.fp_stage = "reset"
-                        st.success("✅ Code verified! Now set a new password.")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid verification code.")
+                # clickable small forgot password text
+                st.markdown(
+                    "<p style='text-align:right; font-size:14px;'>"
+                    "<a href='#' style='color:#1E90FF; text-decoration:none;' "
+                    "onClick='window.location.reload()'>Forgot Password?</a></p>",
+                    unsafe_allow_html=True
+                )
 
-            # Step 3: Reset Password
-            elif st.session_state.fp_stage == "reset":
-                new_pass1 = st.text_input("New Password", type="password", key="fp_new_pass1")
-                new_pass2 = st.text_input("Confirm New Password", type="password", key="fp_new_pass2")
+                # Button to open forgot password section (Streamlit event)
+                if st.button("Forgot Password", use_container_width=True):
+                    st.session_state.show_forgot = True
+                    st.rerun()
 
-                if st.button("Update Password", use_container_width=True, key="fp_update_btn"):
-                    if not new_pass1 or not new_pass2:
-                        st.warning("⚠️ Fill both password fields.")
-                    elif new_pass1 != new_pass2:
-                        st.error("❌ Passwords do not match.")
-                    else:
-                        try:
-                            users = get_all_users(sheet)
-                            usernames = [u.get("username") for u in users]
-                            if st.session_state.fp_user["username"] in usernames:
-                                idx = usernames.index(st.session_state.fp_user["username"]) + 2
-                                hashed_new = hash_password(new_pass1)
-                                sheet.update_cell(idx, 2, hashed_new)
-                                st.success("✅ Password updated! Please log in again.")
-                                # Reset session
-                                st.session_state.fp_stage = "email"
-                                st.session_state.fp_code = None
-                                st.session_state.fp_user = None
-                        except Exception as e:
-                            st.error(f"❌ Failed to update password: {e}")
+            else:
+                # ---------------- FORGOT PASSWORD WORKFLOW ----------------
+                st.markdown("### 🔑 Forgot Password")
+
+                # Step 1: Email input
+                if st.session_state.fp_stage == "email":
+                    fp_email = st.text_input("Enter your registered email", key="fp_email")
+                    if st.button("Send Verification Code", use_container_width=True, key="fp_send_code"):
+                        users = get_all_users(sheet)
+                        matched_user = next(
+                            (u for u in users if str(u.get("email") or "").strip().lower() == fp_email.strip().lower()),
+                            None
+                        )
+                        if not matched_user:
+                            st.error("❌ No account found with this email.")
+                        else:
+                            code = random.randint(100000, 999999)
+                            st.session_state.fp_code = str(code)
+                            st.session_state.fp_user = matched_user
+                            if send_email(fp_email, "Password Reset Code", f"Your verification code is: {code}"):
+                                st.session_state.fp_stage = "code"
+                                st.success("✅ Verification code sent! Check your email.")
+                                st.rerun()
+
+                # Step 2: Code entry
+                elif st.session_state.fp_stage == "code":
+                    entered_code = st.text_input("Enter Verification Code", key="fp_entered_code")
+                    if st.button("Verify Code", use_container_width=True, key="fp_verify_code"):
+                        if entered_code == st.session_state.fp_code:
+                            st.session_state.fp_stage = "reset"
+                            st.success("✅ Code verified! Now set a new password.")
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid verification code.")
+
+                # Step 3: Reset password
+                elif st.session_state.fp_stage == "reset":
+                    new_pass1 = st.text_input("New Password", type="password", key="fp_new_pass1")
+                    new_pass2 = st.text_input("Confirm New Password", type="password", key="fp_new_pass2")
+                    if st.button("Update Password", use_container_width=True, key="fp_update_btn"):
+                        if not new_pass1 or not new_pass2:
+                            st.warning("⚠️ Fill both password fields.")
+                        elif new_pass1 != new_pass2:
+                            st.error("❌ Passwords do not match.")
+                        else:
+                            try:
+                                users = get_all_users(sheet)
+                                usernames = [u.get("username") for u in users]
+                                if st.session_state.fp_user["username"] in usernames:
+                                    idx = usernames.index(st.session_state.fp_user["username"]) + 2
+                                    hashed_new = hash_password(new_pass1)
+                                    sheet.update_cell(idx, 2, hashed_new)
+                                    st.success("✅ Password updated! Please log in again.")
+                                    # Reset state
+                                    st.session_state.fp_stage = "email"
+                                    st.session_state.fp_code = None
+                                    st.session_state.fp_user = None
+                                    st.session_state.show_forgot = False
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Failed to update password: {e}")
+
+                # Back button
+                if st.button("⬅️ Back to Login", use_container_width=True):
+                    st.session_state.show_forgot = False
+                    st.session_state.fp_stage = "email"
+                    st.rerun()
 
         # ---------------- REGISTER TAB ----------------
         with register_tab:
@@ -224,7 +247,8 @@ def app():
 
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="reg_phone")
             new_address = st.text_input("Address", key="reg_address")
-            new_dob = st.date_input("Date of Birth", value=date(2000, 1, 1), min_value=date(1900, 1, 1), max_value=date.today(), key="reg_dob")
+            new_dob = st.date_input("Date of Birth", value=date(2000, 1, 1),
+                                    min_value=date(1900, 1, 1), max_value=date.today(), key="reg_dob")
 
             if st.button("Register", use_container_width=True, key="reg_btn"):
                 if not all([new_user, new_pass, new_re_pass, new_email, new_number, new_address, new_dob]):
