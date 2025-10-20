@@ -190,19 +190,19 @@ def app():
 
             new_email = st.text_input("Email", placeholder="your.email@gmail.com")
             if new_email:
-            if "@" not in new_email or "." not in new_email.split("@")[-1]:
-                st.warning("⚠️ Please enter a valid email address")
-            st.markdown("""
-                <style>
-                input[type=tel] {
-                    width: 100%;
-                    padding: 8px;
-                    font-size: 16px;
-                    border-radius: 5px;
-                    border: 1px solid #ccc;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+                if "@" not in new_email or "." not in new_email.split("@")[-1]:
+                    st.warning("⚠️ Please enter a valid email address")
+                st.markdown("""
+                    <style>
+                    input[type=tel] {
+                        width: 100%;
+                        padding: 8px;
+                        font-size: 16px;
+                        border-radius: 5px;
+                        border: 1px solid #ccc;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
 
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
             new_address = st.text_input("Address")
