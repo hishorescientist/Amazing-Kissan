@@ -114,6 +114,7 @@ def app():
         login_tab, register_tab = st.tabs(["Login", "Register"])
 
         # ---------------- LOGIN TAB ----------------
+        # ---------------- LOGIN TAB ----------------
         with login_tab:
             username_or_email = st.text_input("Username or Email", placeholder="Enter your username or email")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -132,6 +133,49 @@ def app():
                     else:
                         st.error("❌ Invalid username/email or password.")
 
+            # ---------------- FORGOT PASSWORD SECTION ----------------
+            with st.expander("🔑 Forgot Password?"):
+                fp_username = st.text_input("Enter your username or email", key="fp_user")
+                fp_phone = st.text_input("Enter your registered mobile number", key="fp_phone", placeholder="+919876543210")
+
+                if st.button("Verify & Reset Password", use_container_width=True):
+                    users = get_all_users(sheet)
+                    matched_user = next(
+                        (
+                            u for u in users
+                            if (
+                                (u.get("username", "").strip().lower() == fp_username.strip().lower()
+                                 or u.get("email", "").strip().lower() == fp_username.strip().lower())
+                                and u.get("phone", "").strip() == fp_phone.strip()
+                            )
+                        ),
+                        None
+                    )
+
+                    if not matched_user:
+                        st.error("❌ No matching account found with this username/email and mobile number.")
+                    else:
+                        st.success(f"✅ Verified! Hello, {matched_user['username']}. You can now set a new password.")
+                        new_pass1 = st.text_input("New Password", type="password", key="new_pass1")
+                        new_pass2 = st.text_input("Confirm New Password", type="password", key="new_pass2")
+
+                        if st.button("Update Password", use_container_width=True, key="update_pass_btn"):
+                            if not new_pass1 or not new_pass2:
+                                st.warning("⚠️ Please fill both password fields.")
+                            elif new_pass1 != new_pass2:
+                                st.error("❌ Passwords do not match.")
+                            else:
+                                try:
+                                    users = get_all_users(sheet)
+                                    usernames = [u["username"] for u in users]
+                                    if matched_user["username"] in usernames:
+                                        idx = usernames.index(matched_user["username"]) + 2  # +2 to skip header row
+                                        hashed_new = hash_password(new_pass1)
+                                        sheet.update_cell(idx, 2, hashed_new)  # Column B = password
+                                        st.success("✅ Password updated successfully! Please log in again.")
+                                except Exception as e:
+                                    st.error(f"❌ Failed to update password: {e}")
+
         # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
@@ -145,7 +189,9 @@ def app():
                 st.error("❌ Type same password in both fields.")
 
             new_email = st.text_input("Email", placeholder="your.email@gmail.com")
-
+            if new_email:
+            if "@" not in new_email or "." not in new_email.split("@")[-1]:
+                st.warning("⚠️ Please enter a valid email address")
             st.markdown("""
                 <style>
                 input[type=tel] {
@@ -165,6 +211,8 @@ def app():
             if st.button("Register", use_container_width=True):
                 if not all([new_user, new_pass, new_re_pass, new_email, new_number, new_address, new_dob]):
                     st.error("❌ Fill all fields.")
+                elif "@" not in new_email or "." not in new_email.split("@")[-1]:
+                    st.error("❌ Invalid email address.")
                 else:
                     import re
                     phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
