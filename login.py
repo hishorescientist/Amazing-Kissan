@@ -6,6 +6,9 @@ import gspread
 from datetime import date
 from oauth2client.service_account import ServiceAccountCredentials
 import re
+import smtplib
+from email.mime.text import MIMEText
+import random
 
 # --------------------------------------------------------
 # 🔑 GOOGLE SHEET SETUP
@@ -17,7 +20,6 @@ SCOPE = [
 
 @st.cache_resource(show_spinner=False)
 def connect_google_sheet():
-    """Connect to Google Sheet using credentials from st.secrets."""
     if "google" not in st.secrets or "creds" not in st.secrets["google"]:
         st.warning("⚠️ Google credentials missing in secrets.")
         return None
@@ -35,11 +37,9 @@ def connect_google_sheet():
 # 🔐 AUTH FUNCTIONS
 # --------------------------------------------------------
 def hash_password(password):
-    """Securely hash a password using SHA256."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def get_all_users(sheet):
-    """Get all users from the sheet."""
     if not sheet:
         return []
     try:
@@ -48,7 +48,6 @@ def get_all_users(sheet):
         return []
 
 def save_user(sheet, user):
-    """Add or update user details in Google Sheet."""
     if not sheet:
         return False
     users = get_all_users(sheet)
@@ -64,7 +63,7 @@ def save_user(sheet, user):
     ]
     try:
         if user["username"] in usernames:
-            idx = usernames.index(user["username"]) + 2  # Skip header row
+            idx = usernames.index(user["username"]) + 2
             sheet.update(f"A{idx}:G{idx}", [row])
         else:
             sheet.append_row(row)
@@ -74,15 +73,14 @@ def save_user(sheet, user):
         return False
 
 def verify_user(sheet, username_or_email, password):
-    """Validate login credentials (accepts username or email)."""
     hashed = hash_password(password)
     users = get_all_users(sheet)
     return next(
         (
             u for u in users
             if (
-                (str(u.get("username") or "").strip().lower() == username_or_email.strip().lower() or
-                 str(u.get("email") or "").strip().lower() == username_or_email.strip().lower())
+                (str(u.get("username") or "").strip().lower() == username_or_email.strip().lower()
+                 or str(u.get("email") or "").strip().lower() == username_or_email.strip().lower())
                 and u.get("password") == hashed
             )
         ),
@@ -90,15 +88,33 @@ def verify_user(sheet, username_or_email, password):
     )
 
 # --------------------------------------------------------
+# ✉️ EMAIL FUNCTIONS
+# --------------------------------------------------------
+def send_email(receiver_email, subject, message):
+    sender_email = st.secrets["email"]["address"]
+    sender_pass = st.secrets["email"]["password"]
+    msg = MIMEText(message)
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender_email, sender_pass)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        st.error(f"❌ Failed to send email: {e}")
+        return False
+
+# --------------------------------------------------------
 # 🧑 LOGIN PAGE APP FUNCTION
 # --------------------------------------------------------
 def app():
-    """Login and Registration UI."""
     sheet = connect_google_sheet()
-
-    # Initialize session variables safely
     st.session_state.setdefault("logged_in", False)
     st.session_state.setdefault("user", None)
+    st.session_state.setdefault("fp_code", None)
+    st.session_state.setdefault("fp_user", None)
 
     if not st.session_state.logged_in:
         st.markdown("""
@@ -130,51 +146,54 @@ def app():
                         st.error("❌ Invalid username/email or password.")
 
             # ---------------- FORGOT PASSWORD ----------------
-            with st.expander("🔑 Forgot Password?"):
-                fp_username = st.text_input("Enter your username or email", key="fp_user")
-                fp_phone = st.text_input("Enter your registered mobile number", key="fp_phone", placeholder="+919876543210")
-
-                if st.button("Verify & Reset Password", use_container_width=True):
+            st.markdown("### 🔑 Forgot Password?")
+            if not st.session_state.get("fp_code_sent", False):
+                fp_email = st.text_input("Enter your registered email", key="fp_email")
+                if st.button("Send Verification Code", use_container_width=True):
                     users = get_all_users(sheet)
-
-                    if not fp_username or not fp_phone:
-                        st.warning("⚠️ Please enter both username/email and phone number.")
-                        matched_user = None
-                    else:
-                        matched_user = next(
-                            (
-                                u for u in users
-                                if (
-                                    (str(u.get("username") or "").strip().lower() == fp_username.strip().lower()
-                                     or str(u.get("email") or "").strip().lower() == fp_username.strip().lower())
-                                    and str(u.get("phone") or "").strip() == fp_phone.strip()
-                                )
-                            ),
-                            None
-                        )
-
+                    matched_user = next(
+                        (u for u in users if str(u.get("email") or "").strip().lower() == fp_email.strip().lower()), 
+                        None
+                    )
                     if not matched_user:
-                        st.error("❌ No matching account found with this username/email and mobile number.")
+                        st.error("❌ No account found with this email.")
                     else:
-                        st.success(f"✅ Verified! Hello, {matched_user['username']}. You can now set a new password.")
-                        new_pass1 = st.text_input("New Password", type="password", key="new_pass1")
-                        new_pass2 = st.text_input("Confirm New Password", type="password", key="new_pass2")
+                        code = random.randint(100000, 999999)
+                        st.session_state["fp_code"] = str(code)
+                        st.session_state["fp_user"] = matched_user
+                        if send_email(fp_email, "Password Reset Code", f"Your verification code is: {code}"):
+                            st.session_state["fp_code_sent"] = True
+                            st.success("✅ Verification code sent! Check your email.")
 
-                        if st.button("Update Password", use_container_width=True, key="update_pass_btn"):
+            else:
+                entered_code = st.text_input("Enter Verification Code", key="fp_entered_code")
+                if st.button("Verify Code", use_container_width=True):
+                    if entered_code == st.session_state.get("fp_code"):
+                        st.success("✅ Code verified! You can now set a new password.")
+                        new_pass1 = st.text_input("New Password", type="password", key="fp_new1")
+                        new_pass2 = st.text_input("Confirm New Password", type="password", key="fp_new2")
+
+                        if st.button("Update Password", use_container_width=True, key="fp_update_btn"):
                             if not new_pass1 or not new_pass2:
-                                st.warning("⚠️ Please fill both password fields.")
+                                st.warning("⚠️ Fill both password fields.")
                             elif new_pass1 != new_pass2:
                                 st.error("❌ Passwords do not match.")
                             else:
                                 try:
+                                    users = get_all_users(sheet)
                                     usernames = [u.get("username") for u in users]
-                                    if matched_user["username"] in usernames:
-                                        idx = usernames.index(matched_user["username"]) + 2  # +2 to skip header row
+                                    if st.session_state["fp_user"]["username"] in usernames:
+                                        idx = usernames.index(st.session_state["fp_user"]["username"]) + 2
                                         hashed_new = hash_password(new_pass1)
-                                        sheet.update_cell(idx, 2, hashed_new)  # Column B = password
-                                        st.success("✅ Password updated successfully! Please log in again.")
+                                        sheet.update_cell(idx, 2, hashed_new)
+                                        st.success("✅ Password updated! Please log in again.")
+                                        st.session_state["fp_code_sent"] = False
+                                        st.session_state["fp_code"] = None
+                                        st.session_state["fp_user"] = None
                                 except Exception as e:
                                     st.error(f"❌ Failed to update password: {e}")
+                    else:
+                        st.error("❌ Invalid verification code.")
 
         # ---------------- REGISTER TAB ----------------
         with register_tab:
@@ -189,9 +208,8 @@ def app():
                 st.error("❌ Type same password in both fields.")
 
             new_email = st.text_input("Email", placeholder="your.email@gmail.com")
-            if new_email:
-                if "@" not in new_email or "." not in new_email.split("@")[-1]:
-                    st.warning("⚠️ Please enter a valid email address")
+            if new_email and ("@" not in new_email or "." not in new_email.split("@")[-1]):
+                st.warning("⚠️ Please enter a valid email address")
 
             st.markdown("""
                 <style>
@@ -217,7 +235,7 @@ def app():
                 else:
                     phone_pattern = re.compile(r'^\+?\d{1,3}?\d{10}$')
                     if not phone_pattern.match(new_number.strip()):
-                        st.error("📞 Invalid phone number. Must be 10 digits (optionally with country code, e.g. +911234567890).")
+                        st.error("📞 Invalid phone number.")
                     else:
                         user_dict = {
                             "username": new_user.strip(),
@@ -232,6 +250,5 @@ def app():
                             st.success("✅ Registration successful! You can now log in.")
 
     else:
-        # If already logged in → move to profile
         st.session_state.page = "Profile"
         st.rerun()
