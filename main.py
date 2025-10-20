@@ -1,5 +1,5 @@
 import streamlit as st
-from login import app as login_page
+from login_new import app as login_page
 from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
