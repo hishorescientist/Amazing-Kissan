@@ -77,7 +77,7 @@ def verify_user(sheet, username, password):
     """Validate login credentials."""
     hashed = hash_password(password)
     users = get_all_users(sheet)
-    return next((u for u in users if u.get("username")==username and u.get("password")==hashed), None)
+    return next((u for u in users if ((u.get("username")==username or u.get("email")==username ) and u.get("password")==hashed), None))
 
 
 # --------------------------------------------------------
