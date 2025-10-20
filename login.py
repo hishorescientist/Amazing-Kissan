@@ -73,11 +73,23 @@ def save_user(sheet, user):
         st.error(f"❌ Error saving user: {e}")
         return False
 
-def verify_user(sheet, username, password):
-    """Validate login credentials."""
+
+def verify_user(sheet, username_or_email, password):
+    """Validate login credentials (accepts username or email)."""
     hashed = hash_password(password)
     users = get_all_users(sheet)
-    return next((u for u in users if ((u.get("username")==username or u.get("email")==username ) and u.get("password")==hashed), None))
+
+    return next(
+        (
+            u for u in users
+            if (
+                (u.get("username", "").strip().lower() == username_or_email.strip().lower() or
+                 u.get("email", "").strip().lower() == username_or_email.strip().lower())
+                and u.get("password") == hashed
+            )
+        ),
+        None
+    )
 
 
 # --------------------------------------------------------
@@ -98,39 +110,42 @@ def app():
                 You are required to log in every time you enter the app.
             </p>
         """, unsafe_allow_html=True)
+
         login_tab, register_tab = st.tabs(["Login", "Register"])
 
         # ---------------- LOGIN TAB ----------------
         with login_tab:
-            username = st.text_input("Username", placeholder="Enter your username")
+            username_or_email = st.text_input("Username or Email", placeholder="Enter your username or email")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
 
             if st.button("Login", use_container_width=True):
-                if not username or not password:
+                if not username_or_email or not password:
                     st.warning("⚠️ Fill in both fields.")
                 else:
-                    user = verify_user(sheet, username, password)
+                    user = verify_user(sheet, username_or_email, password)
                     if user:
                         st.session_state.logged_in = True
                         st.session_state.user = user
                         st.session_state.page = "Profile"
                         st.success(f"✅ Welcome {user['username']}! Redirecting to your profile...")
-                        st.session_state.page = "Profile"
                         st.rerun()
                     else:
-                        st.error("❌ Invalid username or password.")
+                        st.error("❌ Invalid username/email or password.")
 
         # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
             users = get_all_users(sheet)
-            if any(u.get("username")==new_user.strip() for u in users):
+            if any(u.get("username") == new_user.strip() for u in users):
                 st.warning("⚠️ Username already exists.")
             new_pass = st.text_input("Password", type="password")
-            new_re_pass = st.text_input("Again type Password", type="password")
+            new_re_pass = st.text_input("Confirm Password", type="password")
+
             if new_pass != new_re_pass:
-                    st.error("type same password on both.")
+                st.error("❌ Type same password in both fields.")
+
             new_email = st.text_input("Email", placeholder="your.email@gmail.com")
+
             st.markdown("""
                 <style>
                 input[type=tel] {
@@ -142,14 +157,13 @@ def app():
                 }
                 </style>
             """, unsafe_allow_html=True)
+
             new_number = st.text_input("Phone Number", placeholder="+919876543210", key="phone")
             new_address = st.text_input("Address")
             new_dob = st.date_input("Date of Birth", value=date(2000, 1, 1), min_value=date(1900, 1, 1), max_value=date.today())
-            
-            
 
             if st.button("Register", use_container_width=True):
-                if not new_user or not new_pass or not new_re_pass or not new_email or not new_number or not new_address or not new_dob :
+                if not all([new_user, new_pass, new_re_pass, new_email, new_number, new_address, new_dob]):
                     st.error("❌ Fill all fields.")
                 else:
                     import re
@@ -161,10 +175,11 @@ def app():
                             "username": new_user.strip(),
                             "password": hash_password(new_pass.strip()),
                             "name": new_user.strip(),
-                            "email":new_email.strip(),
-                            "phone":new_number.strip(),
-                            "address":new_address.strip(),
-                            "dob":new_dob.strip()
+                            "email": new_email.strip(),
+                            "phone": new_number.strip(),
+                            "address": new_address.strip(),
+                            # ✅ FIX: date object — don’t call .strip()
+                            "dob": str(new_dob)
                         }
                         if save_user(sheet, user_dict):
                             st.success("✅ Registration successful! You can now log in.")
