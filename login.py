@@ -148,12 +148,12 @@ def app():
                             st.error("❌ Invalid username/email or password.")
 
                 # clickable small forgot password text
-                st.markdown(
-                    "<p style='text-align:right; font-size:14px;'>"
-                    "<a href='#' style='color:#1E90FF; text-decoration:none;' "
-                    "onClick='window.location.reload()'>Forgot Password?</a></p>",
-                    unsafe_allow_html=True
-                )
+#                st.markdown(
+#                    "<p style='text-align:right; font-size:14px;'>"
+#                    "<a href='#' style='color:#1E90FF; text-decoration:none;' "
+#                    "onClick='window.location.reload()'>Forgot Password?</a></p>",
+#                    unsafe_allow_html=True
+#                )
 
                 # Button to open forgot password section (Streamlit event)
                 if st.button("Forgot Password", use_container_width=True):
