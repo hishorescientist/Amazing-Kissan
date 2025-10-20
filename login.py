@@ -52,7 +52,7 @@ def save_user(sheet, user):
     if not sheet:
         return False
     users = get_all_users(sheet)
-    usernames = [u["username"] for u in users]
+    usernames = [u.get("username") for u in users]
     row = [
         user.get("username",""),
         user.get("password",""),
@@ -77,13 +77,12 @@ def verify_user(sheet, username_or_email, password):
     """Validate login credentials (accepts username or email)."""
     hashed = hash_password(password)
     users = get_all_users(sheet)
-
     return next(
         (
             u for u in users
             if (
-                (str(u.get("username","")).strip().lower() == username_or_email.strip().lower()
-                 or str(u.get("email","")).strip().lower() == username_or_email.strip().lower())
+                (str(u.get("username") or "").strip().lower() == username_or_email.strip().lower() or
+                 str(u.get("email") or "").strip().lower() == username_or_email.strip().lower())
                 and u.get("password") == hashed
             )
         ),
@@ -130,7 +129,7 @@ def app():
                     else:
                         st.error("❌ Invalid username/email or password.")
 
-            # ---------------- FORGOT PASSWORD SECTION ----------------
+            # ---------------- FORGOT PASSWORD ----------------
             with st.expander("🔑 Forgot Password?"):
                 fp_username = st.text_input("Enter your username or email", key="fp_user")
                 fp_phone = st.text_input("Enter your registered mobile number", key="fp_phone", placeholder="+919876543210")
@@ -140,53 +139,53 @@ def app():
 
                     if not fp_username or not fp_phone:
                         st.warning("⚠️ Please enter both username/email and phone number.")
+                        matched_user = None
                     else:
                         matched_user = next(
                             (
                                 u for u in users
                                 if (
-                                    (str(u.get("username", "")).strip().lower() == fp_username.strip().lower()
-                                     or str(u.get("email", "")).strip().lower() == fp_username.strip().lower())
-                                    and str(u.get("phone", "")).strip() == fp_phone.strip()
+                                    (str(u.get("username") or "").strip().lower() == fp_username.strip().lower()
+                                     or str(u.get("email") or "").strip().lower() == fp_username.strip().lower())
+                                    and str(u.get("phone") or "").strip() == fp_phone.strip()
                                 )
                             ),
                             None
                         )
 
-                        if not matched_user:
-                            st.error("❌ No matching account found with this username/email and mobile number.")
-                        else:
-                            st.success(f"✅ Verified! Hello, {matched_user['username']}. You can now set a new password.")
-                            new_pass1 = st.text_input("New Password", type="password", key="new_pass1")
-                            new_pass2 = st.text_input("Confirm New Password", type="password", key="new_pass2")
+                    if not matched_user:
+                        st.error("❌ No matching account found with this username/email and mobile number.")
+                    else:
+                        st.success(f"✅ Verified! Hello, {matched_user['username']}. You can now set a new password.")
+                        new_pass1 = st.text_input("New Password", type="password", key="new_pass1")
+                        new_pass2 = st.text_input("Confirm New Password", type="password", key="new_pass2")
 
-                            if st.button("Update Password", use_container_width=True, key="update_pass_btn"):
-                                if not new_pass1 or not new_pass2:
-                                    st.warning("⚠️ Please fill both password fields.")
-                                elif new_pass1 != new_pass2:
-                                    st.error("❌ Passwords do not match.")
-                                else:
-                                    try:
-                                        usernames = [u["username"] for u in users]
-                                        if matched_user["username"] in usernames:
-                                            idx = usernames.index(matched_user["username"]) + 2  # +2 to skip header row
-                                            hashed_new = hash_password(new_pass1)
-                                            sheet.update_cell(idx, 2, hashed_new)  # Column B = password
-                                            st.success("✅ Password updated successfully! Please log in again.")
-                                    except Exception as e:
-                                        st.error(f"❌ Failed to update password: {e}")
+                        if st.button("Update Password", use_container_width=True, key="update_pass_btn"):
+                            if not new_pass1 or not new_pass2:
+                                st.warning("⚠️ Please fill both password fields.")
+                            elif new_pass1 != new_pass2:
+                                st.error("❌ Passwords do not match.")
+                            else:
+                                try:
+                                    usernames = [u.get("username") for u in users]
+                                    if matched_user["username"] in usernames:
+                                        idx = usernames.index(matched_user["username"]) + 2  # +2 to skip header row
+                                        hashed_new = hash_password(new_pass1)
+                                        sheet.update_cell(idx, 2, hashed_new)  # Column B = password
+                                        st.success("✅ Password updated successfully! Please log in again.")
+                                except Exception as e:
+                                    st.error(f"❌ Failed to update password: {e}")
 
         # ---------------- REGISTER TAB ----------------
         with register_tab:
             new_user = st.text_input("New Username")
             users = get_all_users(sheet)
-            if new_user and any(u.get("username") == new_user.strip() for u in users):
+            if any(u.get("username") == new_user.strip() for u in users):
                 st.warning("⚠️ Username already exists.")
-
             new_pass = st.text_input("Password", type="password")
             new_re_pass = st.text_input("Confirm Password", type="password")
 
-            if new_pass and new_re_pass and new_pass != new_re_pass:
+            if new_pass != new_re_pass and new_pass and new_re_pass:
                 st.error("❌ Type same password in both fields.")
 
             new_email = st.text_input("Email", placeholder="your.email@gmail.com")
