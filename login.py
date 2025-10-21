@@ -19,11 +19,11 @@ SCOPE = [
 
 @st.cache_resource(show_spinner=False)
 def connect_google_sheet():
-    if "google" not in st.secrets or "creds" not in st.secrets["google"]:
+    if "google" not in st.secrets or "secrets_creds" not in st.secrets["google"]:
         st.warning("⚠️ Google credentials missing in secrets.")
         return None
     try:
-        creds_json = st.secrets["google"]["creds"]
+        creds_json = st.secrets["google"]["secrets_creds"]
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)

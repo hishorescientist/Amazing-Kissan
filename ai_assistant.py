@@ -16,7 +16,7 @@ SCOPE = [
 @st.cache_resource(show_spinner=False)
 def connect_google_sheet():
     try:
-        creds_json = st.secrets["google"]["creds"]
+        creds_json = st.secrets["google"]["secrets_creds"]
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)

@@ -7,6 +7,7 @@ from about import app as about_page
 from contact import app as contact_page
 from message import app as message_page
 from storage import save_state, load_state, clear_state
+from market import app as market_page
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🌾 Agriculture Assistant", layout="wide")
@@ -108,7 +109,7 @@ with st.sidebar.expander("⚙️ Agri AI Assistant ", expanded=False):
             )
 
 # Additional menu
-extra_menu = ["About", "Contact"]
+extra_menu = ["Market", "About", "Contact"]
 if st.session_state.logged_in:
     extra_menu.append("Profile")
 else:
@@ -130,6 +131,8 @@ elif page == "AI Assistant":
     ai_page()
 elif page == "Message":
     message_page()
+elif page == "Market":
+    market_page()
 elif page == "Contact":
     contact_page()
 elif page == "Login":

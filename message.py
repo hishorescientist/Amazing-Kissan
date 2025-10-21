@@ -16,7 +16,7 @@ SCOPE = [
 def connect_message_sheet():
     """Connect to Google Sheet for messages."""
     try:
-        creds_json = st.secrets["google"]["creds"]
+        creds_json = st.secrets["google"]["secrets_creds"]
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)

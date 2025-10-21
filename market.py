@@ -1,174 +1,256 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import time
+import gspread
 import json
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime, date
 
-# ==============================================================================
-# 🔐 AUTH & STATE FUNCTIONS (REQUIRED FOR NAVIGATION)
-# ==============================================================================
+# ---------------- GOOGLE SHEET SETUP ----------------
+SCOPE = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
-def logout():
-    """Clears session state and returns the user to the login screen."""
-    # Keep only the essential shared state (like the sheet connection)
-    keys_to_delete = [key for key in st.session_state.keys() if key not in ["sheet"]]
-    for key in keys_to_delete:
-        del st.session_state[key]
-    
-    st.session_state.logged_in = False
-    st.session_state.page = "Login" 
-    st.rerun()
-
-# ==============================================================================
-# 🤖 GEMINI API SIMULATION (Marketing Content Generation)
-# ==============================================================================
-
-def generate_marketing_copy(product_name: str, tone: str) -> dict:
-    """
-    Simulates calling the Gemini API to generate marketing copy.
-    
-    NOTE: In a real environment, this function would contain an asynchronous network call 
-    to the Gemini API endpoint. We use a placeholder and a delay here.
-    
-    The payload structure for the actual API call (using gemini-2.5-flash-preview-05-20) 
-    would look like this:
-    
-    const userPrompt = `Write a short, engaging social media post (max 100 words) for our 
-                        freshly harvested ${product_name}. The required tone is ${tone}.`;
-    const systemPrompt = "You are a creative agricultural marketing specialist. 
-                          Your output must be concise and engaging for social media platforms.";
-    
-    const payload = {
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-    };
-    
-    // ... fetch(apiUrl, { method: 'POST', body: JSON.stringify(payload) }) ...
-    """
-    
-    # --- SIMULATION START ---
-    time.sleep(2) # Simulate network delay
-    
-    # Generate mock response text based on input
-    if tone == 'Excited':
-        text = f"Harvest Alert! 🎉 Our **{product_name}** are here—picked this morning, bursting with flavor, and 100% locally sourced. Taste the difference that freshness makes! Find us at the farmers market this weekend! #FarmFresh #LocalProduce"
-    elif tone == 'Informative':
-        text = f"Sustainably Grown **{product_name}**. We focus on soil health and natural methods to bring you the highest quality produce. Learn about our growing practices and commitment to the environment. Available now! #AgriTech #Sustainable"
-    else: # Friendly
-        text = f"Simple, perfect **{product_name}**. Grown with care on our family farm. We love making good food accessible to our community. Stop by our stand today! #FamilyFarm #Community"
-
-    # Simulate grounding sources
-    sources = [
-        {"title": "USDA Fresh Produce Standards", "uri": "https://mock.google.com/usda-standards"},
-        {"title": "Local Farmers Market Guide", "uri": "https://mock.google.com/market-guide"}
-    ]
-    
-    return {"text": text, "sources": sources}
-    # --- SIMULATION END ---
+def connect_google_sheet(sheet_name):
+    if "google" not in st.secrets or "secrets_creds" not in st.secrets["google"]:
+        st.warning("⚠️ Google credentials missing in secrets.")
+        return None
+    try:
+        creds_json = st.secrets["google"]["secrets_creds"]
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        client = gspread.authorize(creds)
+        return client.open("User").worksheet(sheet_name)
+    except Exception as e:
+        st.warning(f"⚠️ Could not connect to Google Sheets: {e}")
+        return None
 
 
-# ==============================================================================
-# 🌾 MARKETING APPLICATION UI
-# ==============================================================================
+# ---------------- MARKET PAGE ----------------
+def app():
+    st.title("🌾 Agricultural Market System")
 
-def agri_marketing_app():
-    """Main function for the agricultural marketing dashboard."""
-    
-    # Safety Check: Ensure the user is logged in
-    if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-        st.error("🔒 Access Denied. Please log in to view the marketing dashboard.")
-        st.session_state.page = "Login"
-        st.rerun()
-        return
+    # --- LOGIN CHECK ---
+    if "logged_in" not in st.session_state or not st.session_state.logged_in:
+        st.warning("⚠️ Please log in first.")
+        st.stop()
 
     user = st.session_state.user
-    
-    # ------------------ SIDEBAR & LOGOUT ------------------
-    with st.sidebar:
-        st.subheader("Welcome")
-        st.success(f"Logged in as: **{user.get('username', 'Guest')}**")
-        st.markdown(f"User: `{user.get('email', 'N/A')}`")
-        st.button("Logout", on_click=logout, type="primary", use_container_width=True)
-        st.markdown("---")
-        st.caption("Marketing Tools")
+    username = user.get("username", "Unknown User")
+    address = user.get("address", "")
+    phone = user.get("phone", "")
+    email = user.get("email", "")
 
+    # --- STATE VARIABLE FOR ALERT PAGE ---
+    st.session_state.setdefault("view_order_alerts", False)
 
-    # ------------------ MAIN DASHBOARD ------------------
-    st.title("🌱 Agricultural Product Marketing Dashboard")
-    st.markdown(f"Hello, **{user.get('name', user.get('username', 'Farmer'))}**. Strategize your sales and promotions here.")
-    
-    st.markdown("---")
+    # --- CONNECT SHEETS ---
+    market_sheet = connect_google_sheet("Sheet5")  # Crops
+    orders_sheet = connect_google_sheet("Sheet6")  # Orders
+    if not market_sheet or not orders_sheet:
+        st.error("❌ Unable to connect to Google Sheets.")
+        return
 
-    # Use tabs to organize different marketing aspects
-    tab1, tab2, tab3 = st.tabs(["✍️ AI Copy Generator", "💰 Pricing Strategy", "📊 Sales Analysis"])
+    # =====================================================
+    # 🔔 ORDER ALERT PAGE (All Orders Stay Visible)
+    # =====================================================
+    if st.session_state.view_order_alerts:
+        st.header("📣 Order Alerts")
 
-    # --- TAB 1: AI COPY GENERATOR ---
+        try:
+            all_orders = orders_sheet.get_all_records()
+            all_orders = [{k.strip(): v for k, v in row.items()} for row in all_orders]
+            my_sales = [o for o in all_orders if o.get("Farmer Name") == username]
+
+            if my_sales:
+                for order in my_sales:
+                    order_id = order.get("Order ID")
+                    status = order.get("Status", "Pending")
+                    delivery_type = order.get("Delivery Option", "Pickup")
+
+                    st.markdown("---")
+                    cols = st.columns([4, 1, 1])
+                    cols[0].write(
+                        f"**Buyer:** {order['Buyer Name']} wants {order['Quantity']} kg of {order['Crop Name']} "
+                        f"for ₹{order['Price']} | **Delivery:** {delivery_type} | **Status:** {status}"
+                    )
+
+                    # --- STATUS HANDLER ---
+                    if status.startswith("Accepted"):
+                        st.success(f"✅ Order accepted ({status})")
+                    elif status == "Rejected":
+                        st.error("❌ Order rejected.")
+                    else:
+                        # ---------------- PICKUP ORDERS ----------------
+                        if delivery_type == "Pickup":
+                            if cols[1].button("✅ Accept", key=f"pickup_accept_{order_id}"):
+                                try:
+                                    row_index = next(i + 2 for i, r in enumerate(all_orders) if r.get("Order ID") == order_id)
+                                    orders_sheet.update_cell(row_index, 8, "Accepted (Pickup)")
+                                    st.success(f"✅ Order {order_id} accepted for pickup.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating pickup order: {e}")
+
+                            if cols[2].button("❌ Reject", key=f"pickup_reject_{order_id}"):
+                                try:
+                                    row_index = next(i + 2 for i, r in enumerate(all_orders) if r.get("Order ID") == order_id)
+                                    orders_sheet.update_cell(row_index, 8, "Rejected")
+                                    st.warning(f"❌ Order {order_id} rejected.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error rejecting order: {e}")
+
+                        # ---------------- HOME DELIVERY ORDERS ----------------
+                        else:
+                            if cols[1].button("✅ Accept", key=f"home_accept_{order_id}"):
+                                with st.expander(f"🚚 Delivery Setup for Order {order_id}", expanded=True):
+                                    delivery_choice = st.radio(
+                                        "Choose Delivery Type:",
+                                        ["I will deliver to home directly", "Courier"],
+                                        key=f"choice_{order_id}"
+                                    )
+
+                                    if delivery_choice == "Courier":
+                                        courier_company = st.text_input("Courier Company Name", key=f"courier_{order_id}")
+                                        tracking_number = st.text_input("Tracking Number", key=f"track_{order_id}")
+                                        expected_date = st.date_input("Expected Delivery Date", min_value=date.today(), key=f"date_{order_id}")
+
+                                        if st.button("📦 Confirm Courier Delivery", key=f"confirm_{order_id}"):
+                                            try:
+                                                row_index = next(i + 2 for i, r in enumerate(all_orders) if r.get("Order ID") == order_id)
+                                                orders_sheet.update_cell(row_index, 8, "Accepted (Courier)")
+                                                orders_sheet.update_cell(row_index, 9, courier_company)
+                                                orders_sheet.update_cell(row_index, 10, tracking_number)
+                                                orders_sheet.update_cell(row_index, 11, str(expected_date))
+                                                st.success("✅ Courier details saved.")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Error saving courier details: {e}")
+
+                                    elif delivery_choice == "I will deliver to home directly":
+                                        if st.button("🚚 Confirm Direct Delivery", key=f"direct_{order_id}"):
+                                            try:
+                                                row_index = next(i + 2 for i, r in enumerate(all_orders) if r.get("Order ID") == order_id)
+                                                orders_sheet.update_cell(row_index, 8, "Accepted (Home Delivery)")
+                                                st.success("✅ Marked as direct home delivery.")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Error updating delivery: {e}")
+
+                            if cols[2].button("❌ Reject", key=f"home_reject_{order_id}"):
+                                try:
+                                    row_index = next(i + 2 for i, r in enumerate(all_orders) if r.get("Order ID") == order_id)
+                                    orders_sheet.update_cell(row_index, 8, "Rejected")
+                                    st.warning(f"❌ Order {order_id} rejected.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error rejecting order: {e}")
+            else:
+                st.info("No orders yet.")
+        except Exception as e:
+            st.error(f"❌ Failed to load orders: {e}")
+
+        if st.button("⬅️ Back to Market"):
+            st.session_state.view_order_alerts = False
+            st.rerun()
+        return
+
+    # =====================================================
+    # 🔔 ALERT BUTTON (TOP OF PAGE)
+    # =====================================================
+    try:
+        all_orders = orders_sheet.get_all_records()
+        all_orders = [{k.strip(): v for k, v in row.items()} for row in all_orders]
+        my_sales = [o for o in all_orders if o.get("Farmer Name") == username and o.get("Status") == "Pending"]
+        if my_sales:
+            if st.button(f"📣 You have {len(my_sales)} pending order(s)! Click to view"):
+                st.session_state.view_order_alerts = True
+                st.rerun()
+    except Exception as e:
+        st.error(f"❌ Failed to load order alerts: {e}")
+
+    # =====================================================
+    # 🛒 MAIN TABS
+    # =====================================================
+    tab1, tab2, tab3 = st.tabs(["Sell Crops", "View Market", "My Orders"])
+
+    # SELL CROPS
     with tab1:
-        st.header("Generate Social Media Content")
-        st.markdown("Instantly create engaging social media posts for your products using AI.")
+        st.subheader("🧑‍🌾 Post Your Crop for Sale")
+        st.text_input("Your Name", value=username, disabled=True)
+        st.text_input("Location (Address)", value=address, disabled=True)
+        st.text_input("Phone Number", value=phone, disabled=True)
 
-        with st.form("marketing_copy_form"):
-            col_prod, col_tone = st.columns(2)
-            with col_prod:
-                product_name = st.text_input("Product Name", value="Organic Heritage Tomatoes", help="e.g., Gala Apples, Free-Range Eggs")
-            with col_tone:
-                tone = st.selectbox("Desired Tone", ['Friendly', 'Excited', 'Informative'], index=0)
-            
-            submitted = st.form_submit_button("Generate Copy", use_container_width=True)
+        crop_options = ["Paddy", "Wheat", "Maize", "Millet", "Sugarcane", "Cotton",
+                        "Groundnut", "Vegetables", "Fruits", "Other"]
+        crop = st.selectbox("🌱 Select Crop Name", crop_options)
+        if crop == "Other":
+            crop = st.text_input("Enter Crop Name")
 
-            if submitted:
-                if not product_name:
-                    st.error("Please enter a product name.")
-                else:
-                    with st.spinner(f"AI is crafting a {tone} post for {product_name}..."):
-                        response = generate_marketing_copy(product_name, tone)
-                        
-                        st.subheader("Generated Post")
-                        # Display the generated content
-                        st.markdown(response["text"])
+        quantity = st.number_input("Quantity (kg)", min_value=1)
+        price = st.number_input("Price (₹ per kg)", min_value=1)
 
-                        st.subheader("Grounded Sources")
-                        # Display the mock sources/citations
-                        for source in response["sources"]:
-                            st.caption(f"🔗 [{source['title']}]({source['uri']})")
-                        st.success("Content generation complete!")
+        if st.button("✅ Post to Market", use_container_width=True):
+            try:
+                market_sheet.append_row([username, crop, quantity, price, address, phone, email])
+                st.success("🌾 Crop posted successfully!")
+            except Exception as e:
+                st.error(f"❌ Failed to post crop: {e}")
 
-    # --- TAB 2: PRICING STRATEGY ---
+    # VIEW MARKET
     with tab2:
-        st.header("Wholesale Price Calculator")
-        st.markdown("Determine your minimum viable price based on your cost of production and desired margin.")
-        
-        col_cost, col_yield, col_margin = st.columns(3)
-        
-        cost_per_acre = col_cost.number_input("Total Production Cost (per acre)", value=1500.0, min_value=0.0, step=100.0, format="%.2f")
-        yield_per_acre = col_yield.number_input("Estimated Yield (per unit/acre)", value=500, min_value=1, step=10, help="e.g., 500 lbs of apples, 50 dozen eggs")
-        desired_margin = col_margin.slider("Desired Profit Margin (%)", min_value=10, max_value=70, value=35)
-        
-        if yield_per_acre > 0:
-            cost_per_unit = cost_per_acre / yield_per_acre
-            min_selling_price = cost_per_unit * (1 + (desired_margin / 100))
-            
-            st.markdown("---")
-            st.metric(label="Cost Per Unit (Breakeven)", value=f"${cost_per_unit:,.2f}")
-            st.metric(label="Minimum Target Wholesale Price", value=f"**${min_selling_price:,.2f}**", delta=f"+{desired_margin}% Margin")
-        else:
-            st.warning("Yield per acre must be greater than zero.")
+        st.subheader("📈 Available Crops in Market")
+        try:
+            data = market_sheet.get_all_records()
+            data = [{k.strip(): v for k, v in row.items()} for row in data]
 
-    # --- TAB 3: SALES ANALYSIS ---
+            if not data:
+                st.info("No crops listed yet.")
+            else:
+                for idx, row in enumerate(data):
+                    st.write(
+                        f"**Seller:** {row.get('Farmer Name','')} | "
+                        f"**Crop:** {row.get('Crop Name','')} | "
+                        f"**Qty:** {row.get('Quantity (kg)','')} kg | "
+                        f"**Price:** ₹{row.get('Price (₹/kg)','')}"
+                    )
+                    st.write(f"**Location:** {row.get('Location','')} | **Phone:** {row.get('Phone','')}")
+
+                    delivery_option = st.selectbox(
+                        f"Choose Delivery Option for {row.get('Crop Name')}",
+                        ["Pickup", "Home Delivery"],
+                        key=f"delivery_{idx}"
+                    )
+
+                    buy_button = st.button(f"💰 Buy {row.get('Crop Name','')}", key=f"buy_{idx}")
+                    if buy_button:
+                        order_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+                        orders_sheet.append_row([
+                            order_id, row.get("Crop Name"), row.get("Quantity (kg)"),
+                            row.get("Price (₹/kg)"), username, email,
+                            row.get("Farmer Name"), "Pending", "", "", "", delivery_option
+                        ])
+                        st.success("✅ Order placed! Seller will confirm soon.")
+                    st.markdown("---")
+        except Exception as e:
+            st.error(f"❌ Failed to load market data: {e}")
+
+    # MY ORDERS
     with tab3:
-        st.header("Seasonal Sales Comparison")
-        st.markdown("Visualize how this year's sales compare to last year's.")
-        
-        # Mock Data for visualization
-        chart_data = pd.DataFrame(
-            {
-                "Month": ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                "Sales_2024": np.array([20000, 22000, 25000, 35000, 42000, 50000]) * (1 + np.random.randn(6) * 0.05),
-                "Sales_2023": np.array([18000, 20000, 23000, 32000, 40000, 48000]) * (1 + np.random.randn(6) * 0.05),
-            }
-        ).set_index("Month")
-
-        st.line_chart(chart_data)
-        
-        st.dataframe(chart_data, use_container_width=True)
-        st.info("The charts show a healthy sales increase year-over-year. Keep optimizing your marketing!")
+        st.subheader("📦 My Orders (Buyer View)")
+        try:
+            all_orders = orders_sheet.get_all_records()
+            my_orders = [o for o in all_orders if o.get("Buyer Name") == username]
+            if not my_orders:
+                st.info("No orders placed yet.")
+            else:
+                for order in my_orders:
+                    st.write(f"**Crop:** {order['Crop Name']} | **Status:** {order['Status']}")
+                    st.write(f"**Farmer:** {order['Farmer Name']} | **Delivery:** {order.get('Delivery Option','')}")
+                    if "Courier" in order.get("Status", ""):
+                        st.write(f"📦 Courier: {order.get('Courier Company','N/A')}")
+                        st.write(f"🔢 Tracking No.: {order.get('Tracking Number','N/A')}")
+                        st.write(f"📅 Expected: {order.get('Expected Delivery','N/A')}")
+                    st.markdown("---")
+        except Exception as e:
+            st.error(f"❌ Failed to load your orders: {e}")

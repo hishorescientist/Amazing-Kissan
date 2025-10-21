@@ -19,7 +19,7 @@ def connect_gsheet():
         st.warning("⚠️ Google credentials missing in secrets.")
         return None
     try:
-        creds_json = st.secrets["google"]["creds"]
+        creds_json = st.secrets["google"]["secrets_creds"]
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
         client = gspread.authorize(creds)
