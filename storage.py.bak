@@ -1,53 +1,44 @@
+# storage.py
 import streamlit as st
-import streamlit.components.v1 as components
 import json
 
-# ------------------ SAVE STATE ------------------
-def save_state(state_dict):
-    """
-    Save Streamlit session state to browser localStorage.
-    """
-    try:
-        json_data = json.dumps(state_dict)
-        components.html(f"""
-        <script>
-        localStorage.setItem("agri_app_state", JSON.stringify({json_data}));
-        </script>
-        """, height=0)
-    except Exception as e:
-        st.warning(f"Save error: {e}")
-
-
-# ------------------ LOAD STATE ------------------
-def load_state():
-    """
-    Load Streamlit state from browser localStorage.
-    (Note: Streamlit cannot directly read JS values; this triggers sync.)
-    """
-    components.html("""
+def sync_from_browser():
+    """Injects JavaScript to sync localStorage -> query params (so Streamlit can read)"""
+    st.markdown("""
     <script>
-    const saved = localStorage.getItem("agri_app_state");
-    if (saved) {{
-        const data = JSON.parse(saved);
-        window.parent.postMessage({{ type: "RESTORE_STATE", data: data }}, "*");
-    }}
+    const savedState = localStorage.getItem("agri_state");
+    if (savedState) {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has("user_state")) {
+            params.set("user_state", savedState);
+            const newUrl = window.location.pathname + '?' + params.toString();
+            window.location.replace(newUrl);
+        }
+    }
     </script>
-    """, height=0)
+    """, unsafe_allow_html=True)
 
-    # This can’t receive JS data directly, but allows prefill from previous sync
-    if "local_state_cache" in st.session_state:
-        return st.session_state.local_state_cache
+def load_state():
+    """Reads state from query params"""
+    params = st.query_params
+    if "user_state" in params:
+        try:
+            return json.loads(params["user_state"])
+        except:
+            return None
     return None
 
-
-# ------------------ CLEAR STATE ------------------
-def clear_state():
-    """
-    Clears the localStorage data for this app only.
-    """
-    components.html("""
+def save_state(state):
+    """Injects JS to write to browser localStorage"""
+    js = f"""
     <script>
-    localStorage.removeItem("agri_app_state");
-    alert("🧹 Local data cleared!");
+    localStorage.setItem("agri_state", JSON.stringify({json.dumps(state)}));
     </script>
-    """, height=0)
+    """
+    st.markdown(js, unsafe_allow_html=True)
+
+def clear_state():
+    """Removes login data from localStorage (used during logout)"""
+    st.markdown("""
+    <script> localStorage.removeItem("agri_state"); </script>
+    """, unsafe_allow_html=True)
