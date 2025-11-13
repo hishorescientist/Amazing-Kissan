@@ -24,12 +24,12 @@ def app():
         <div style='display: flex; justify-content: center; gap: 40px; margin-top: 30px;'>
             <div style='background-color: #f5f5f5; padding: 20px 40px; border-radius: 15px; 
                         box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;'>
-                <h3 style='color: #1F618D;'>📱 Contact Number 1</h3>
+                <h3 style='color: #1F618D;'>Contact Number 1</h3>
                 <p style='font-size: 20px; font-weight: bold;'>+91 83443 73555</p>
             </div>
             <div style='background-color: #f5f5f5; padding: 20px 40px; border-radius: 15px; 
                         box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;'>
-                <h3 style='color: #1F618D;'>📱 Contact Number 2</h3>
+                <h3 style='color: #1F618D;'>Contact Number 2</h3>
                 <p style='font-size: 20px; font-weight: bold;'>+91 85249 46296</p>
             </div>
         </div>
