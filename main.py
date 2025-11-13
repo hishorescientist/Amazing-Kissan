@@ -3,7 +3,7 @@ from login import app as login_page
 from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
-from about1 import app as about_page
+from about import app as about_page
 from contact import app as contact_page
 from message import app as message_page
 from storage import save_state, load_state, clear_state
