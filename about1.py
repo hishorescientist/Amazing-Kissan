@@ -58,6 +58,6 @@ def app():
         """, unsafe_allow_html=True
     )
 
-**# --- ADD THIS LINE TO RUN THE APP ---**
-**if __name__ == '__main__':**
-** app()**
+# --- ADD THIS LINE TO RUN THE APP ---
+if __name__ == '__main__':
+ app()
