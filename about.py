@@ -21,8 +21,7 @@ def app():
 
     # Mission and Vision Cards
     st.markdown(
-        """
-        <div style='display:flex; justify-content:center; gap:40px; margin-top:40px; flex-wrap:wrap;'>
+        """<div style='display:flex; justify-content:center; gap:40px; margin-top:40px; flex-wrap:wrap;'>
 
             <div style='background-color:#f8f9fa; padding:25px; border-radius:15px; width:280px; 
                         box-shadow:0 4px 10px rgba(0,0,0,0.1); text-align:center;'>
@@ -42,9 +41,7 @@ def app():
                 </p>
             </div>
 
-        </div>
-        """, unsafe_allow_html=True
-    )
+        </div>""", unsafe_allow_html=True)
 
     st.write("")
     st.markdown("<hr>", unsafe_allow_html=True)
