@@ -4,7 +4,7 @@ from profile import app as profile_page
 from ai_assistant import app as ai_page
 from home import app as home_page
 from about import app as about_page
-from contact import app as contact_page
+from contact1 import app as contact_page
 from message import app as message_page
 from storage import save_state, load_state, clear_state
 from market import app as market_page
