@@ -40,8 +40,7 @@ def app():
                     embrace smarter and more sustainable farming methods.
                 </p>
             </div>
-
-        </div>""", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
     st.write("")
     st.markdown("<hr>", unsafe_allow_html=True)
