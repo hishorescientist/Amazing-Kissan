@@ -43,7 +43,7 @@ def app():
     st.markdown(
         """
         <div style='text-align: center; color: #555; margin-top: 15px;'>
-            <small>© 2025 Your Company Name. All rights reserved.</small>
+            <small>© 2025 Amazing Kissan. All rights reserved.</small>
         </div>
         """, unsafe_allow_html=True
     )
